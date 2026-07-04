@@ -8,8 +8,10 @@ listen: ":8080"
 repo_dir: "./data/team-docs"
 
 # Optional one-way mirror: after every commit the server pushes to this remote.
-# The remote must already be configured inside the repo, e.g.:
-#   git -C ./data/team-docs remote add origin git@github.com:you/team-docs.git
+# The remote must already be configured inside the repo — when running the
+# Docker deployment, add it through the container after the first start:
+#   docker compose exec docsli git -C /data/team-docs remote add origin git@github.com:you/team-docs.git
+# (running from source: git -C ./data/team-docs remote add origin ...)
 # Credentials come from the environment (SSH key / credential helper), never
 # from this file.
 mirror:

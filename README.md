@@ -89,6 +89,10 @@ curl -O https://raw.githubusercontent.com/chalvinwz/docsli/main/examples/docker-
 curl -o config.yml https://raw.githubusercontent.com/chalvinwz/docsli/main/config.example.yml
 
 $EDITOR config.yml           # map tokens to identities; openssl rand -hex 24
+
+# Linux hosts only: the container runs as uid 1000, so pre-create the data dir
+mkdir -p data && sudo chown -R 1000:1000 data
+
 docker compose up -d
 
 curl http://localhost:8080/healthz    # → ok
@@ -143,14 +147,13 @@ The mirror gives you an off-site backup plus GitHub's UI for humans to read docs
    ssh-keygen -t ed25519 -f deploy_key -N "" -C "docsli-mirror"
    ```
 
-   In the repo: *Settings → Deploy keys → Add deploy key*, paste `deploy_key.pub`, and check **Allow write access**.
-3. **Add the remote** to the data repo:
+   In the repo: *Settings → Deploy keys → Add deploy key*, paste `deploy_key.pub`, and check **Allow write access**. The key must be readable by uid 1000, the container user — on Linux hosts:
 
    ```bash
-   git -C data/team-docs remote add origin git@github.com:you/team-docs.git
+   sudo chown 1000:1000 deploy_key && sudo chmod 600 deploy_key
    ```
 
-4. **Enable the mirror** in `config.yml`:
+3. **Enable the mirror** — in `config.yml`:
 
    ```yaml
    mirror:
@@ -158,7 +161,7 @@ The mirror gives you an off-site backup plus GitHub's UI for humans to read docs
      remote: "origin"
    ```
 
-5. **Mount the key** — uncomment the two lines in `docker-compose.yml`:
+   and make sure the key mount is in `docker-compose.yml` (present by default; these are the lines to delete when running without a mirror):
 
    ```yaml
    volumes:
@@ -167,7 +170,22 @@ The mirror gives you an off-site backup plus GitHub's UI for humans to read docs
      GIT_SSH_COMMAND: ssh -i /home/docsli/.ssh/id_ed25519 -o StrictHostKeyChecking=accept-new
    ```
 
-6. `docker compose up -d` again. Every commit now pushes asynchronously; a 60-second ticker retries anything that failed (network down, GitHub hiccup). A failing mirror never blocks or fails an agent's write.
+   Then `docker compose up -d`.
+
+4. **Add the remote** to the data repo. Do it through the container — the repo doesn't exist until docsli's first start, and on Linux it's owned by the container user:
+
+   ```bash
+   docker compose exec docsli git -C /data/team-docs remote add origin git@github.com:you/team-docs.git
+   ```
+
+   (Running from source on macOS? `git -C data/team-docs remote add ...` on the host works too.)
+
+That's it — no restart needed. Every commit now pushes asynchronously, and a 60-second ticker retries anything that failed (network down, GitHub hiccup), so the first push lands within a minute. A failing mirror never blocks or fails an agent's write. Verify:
+
+```bash
+docker compose exec docsli ssh -T git@github.com     # → "Hi you/team-docs! You've successfully authenticated..."
+docker compose logs -f docsli | grep mirror          # push errors show up here as WARN
+```
 
 Prefer HTTPS? Use a fine-grained PAT restricted to that single repo and set the remote URL to `https://x-access-token:<PAT>@github.com/you/team-docs.git`. Credentials always come from the environment or the remote URL — never from `config.yml`.
 
@@ -227,6 +245,20 @@ server {
 - **Persistence:** keep the data volume on durable disk (EBS on EC2), and enable the GitHub mirror as an off-site backup.
 - **Rate limiting** is not built in; add nginx `limit_req` or AWS WAF in front if the endpoint is internet-facing.
 
+## Troubleshooting
+
+Errors you may hit on first deployment. Mirror-push failures are logged as `WARN` and retried by the 60-second ticker — agent writes keep working while you fix them.
+
+| Error in the logs | Cause → fix |
+|---|---|
+| `could not lock config file .git/config: Permission denied` | Bind-mounted `data/` is owned by root, not the container's uid 1000. `sudo chown -R 1000:1000 data`, then restart. |
+| `'origin' does not appear to be a git repository` | The mirror remote was never added inside the data repo. `docker compose exec docsli git -C /data/team-docs remote add origin git@github.com:you/team-docs.git` — the next tick pushes. |
+| `Permission denied (publickey)` | Deploy key problem: not mounted at `./deploy_key`, wrong owner/mode (`sudo chown 1000:1000 deploy_key && sudo chmod 600 deploy_key`), or `deploy_key.pub` not added to the GitHub repo with **write access**. |
+| `Host key verification failed` | The `GIT_SSH_COMMAND` line with `-o StrictHostKeyChecking=accept-new` is missing from the compose file. |
+| `repo at ... has uncommitted changes` on startup | docsli refuses a dirty pre-existing repo (reads rely on worktree == HEAD). Commit or clean it with plain git, then start again. |
+
+Quick health checks: `curl http://localhost:8080/healthz` for the server, `docker compose exec docsli ssh -T git@github.com` for mirror auth.
+
 ## Security notes
 
 - **Run behind TLS.** docsli speaks plain HTTP; put it behind a reverse proxy (Caddy, nginx, Traefik, ALB) or keep it on a private network / VPN. Bearer tokens are transport secrets — over plain HTTP on a public network they can be sniffed.
@@ -264,7 +296,7 @@ Deliberately out of v1 — the current design keeps them possible:
 - Semantic / vector search
 - Multi-repo support
 - User-management endpoints and metrics
-- Published container images (ghcr.io) and prebuilt binaries
+- Prebuilt binaries (goreleaser)
 
 ## License
 
