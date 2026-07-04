@@ -2,13 +2,24 @@
 package main
 
 import (
+	"context"
+	"errors"
 	"flag"
 	"fmt"
 	"log/slog"
+	"net/http"
 	"os"
+	"os/signal"
+	"syscall"
+	"time"
 
+	sdkauth "github.com/modelcontextprotocol/go-sdk/auth"
+	"github.com/modelcontextprotocol/go-sdk/mcp"
+
+	"github.com/chalvinwz/docsli/internal/auth"
 	"github.com/chalvinwz/docsli/internal/config"
 	"github.com/chalvinwz/docsli/internal/gitstore"
+	"github.com/chalvinwz/docsli/internal/mcpserver"
 )
 
 // version is injected at build time via -ldflags "-X main.version=...".
@@ -43,7 +54,43 @@ func run(configPath string, logger *slog.Logger) error {
 	}
 	logger.Info("repository ready", "dir", store.Dir(), "mirror", cfg.Mirror.Enabled)
 
-	// MCP server over streamable HTTP lands in a later milestone.
-	logger.Info("docsli configured", "listen", cfg.Listen, "version", version)
-	return nil
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
+	srv := mcpserver.New(store, logger, version)
+	handler := mcp.NewStreamableHTTPHandler(
+		func(*http.Request) *mcp.Server { return srv },
+		&mcp.StreamableHTTPOptions{Stateless: true},
+	)
+
+	mux := http.NewServeMux()
+	mux.Handle("/mcp", sdkauth.RequireBearerToken(auth.Verifier(cfg.Tokens), nil)(handler))
+	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, _ *http.Request) {
+		fmt.Fprintln(w, "ok")
+	})
+
+	httpSrv := &http.Server{
+		Addr:              cfg.Listen,
+		Handler:           mux,
+		ReadHeaderTimeout: 10 * time.Second,
+	}
+
+	errCh := make(chan error, 1)
+	go func() {
+		logger.Info("docsli listening", "addr", cfg.Listen, "endpoint", "/mcp", "version", version)
+		errCh <- httpSrv.ListenAndServe()
+	}()
+
+	select {
+	case err := <-errCh:
+		return err
+	case <-ctx.Done():
+		logger.Info("shutting down")
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		if err := httpSrv.Shutdown(shutdownCtx); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			return err
+		}
+		return nil
+	}
 }
