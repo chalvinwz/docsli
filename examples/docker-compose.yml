@@ -1,7 +1,8 @@
-# Production compose: runs the published image from ghcr.io — no local build,
+# Deployment compose: runs the published image from ghcr.io — no local build,
 # no cloned repo needed. See the README "Quickstart" for setup.
 #
-#   docker compose -f docker-compose.prod.yml up -d
+#   curl -O https://raw.githubusercontent.com/chalvinwz/docsli/main/examples/docker-compose.yml
+#   docker compose up -d
 services:
   docsli:
     image: ghcr.io/chalvinwz/docsli:latest
