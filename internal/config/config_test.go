@@ -16,6 +16,15 @@ func writeConfig(t *testing.T, content string) string {
 	return path
 }
 
+// clearEnv shields tests from DOCSLI_* variables on the host and gives each
+// test a clean slate to set its own.
+func clearEnv(t *testing.T) {
+	t.Helper()
+	for _, v := range envVars {
+		t.Setenv(v, "")
+	}
+}
+
 const validTokens = `
 tokens:
   - token: "dsl_chalvin_0123456789abcdef"
@@ -27,6 +36,7 @@ tokens:
 `
 
 func TestLoad(t *testing.T) {
+	clearEnv(t)
 	repoDir := filepath.Join(t.TempDir(), "docs")
 
 	tests := []struct {
@@ -130,7 +140,89 @@ tokens:
 }
 
 func TestLoadMissingFile(t *testing.T) {
+	clearEnv(t)
 	if _, err := Load(filepath.Join(t.TempDir(), "nope.yml")); err == nil {
-		t.Fatal("want error for missing file")
+		t.Fatal("want error for missing file when no env config is set")
+	}
+}
+
+func TestLoadEnvOnly(t *testing.T) {
+	clearEnv(t)
+	repoDir := filepath.Join(t.TempDir(), "docs")
+	t.Setenv("DOCSLI_LISTEN", ":9999")
+	t.Setenv("DOCSLI_REPO_DIR", repoDir)
+	t.Setenv("DOCSLI_TOKENS",
+		"dsl_chalvin_0123456789abcdef:Chalvin (agent):chalvin-agent@example.com; "+
+			"dsl_john_0123456789abcdef:John (agent):john-agent@example.com")
+
+	cfg, err := Load(filepath.Join(t.TempDir(), "nope.yml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.Listen != ":9999" || cfg.RepoDir != repoDir {
+		t.Errorf("cfg = %+v", cfg)
+	}
+	if len(cfg.Tokens) != 2 {
+		t.Fatalf("tokens = %+v, want 2", cfg.Tokens)
+	}
+	if cfg.Tokens[1].Name != "John (agent)" || cfg.Tokens[1].Email != "john-agent@example.com" {
+		t.Errorf("token[1] = %+v", cfg.Tokens[1])
+	}
+	if cfg.Mirror.Remote != "origin" {
+		t.Errorf("defaults must still apply, mirror.remote = %q", cfg.Mirror.Remote)
+	}
+}
+
+func TestLoadEnvOverridesFile(t *testing.T) {
+	clearEnv(t)
+	repoDir := filepath.Join(t.TempDir(), "docs")
+	path := writeConfig(t, "listen: \":8080\"\nrepo_dir: "+repoDir+"\n"+validTokens)
+
+	t.Setenv("DOCSLI_LISTEN", ":7777")
+	t.Setenv("DOCSLI_TOKENS", "dsl_env_0123456789abcdefgh:Env (agent):env-agent@example.com")
+	t.Setenv("DOCSLI_MIRROR_ENABLED", "true")
+	t.Setenv("DOCSLI_MIRROR_REMOTE", "backup")
+
+	cfg, err := Load(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.Listen != ":7777" {
+		t.Errorf("listen = %q, env must win", cfg.Listen)
+	}
+	if len(cfg.Tokens) != 1 || cfg.Tokens[0].Name != "Env (agent)" {
+		t.Errorf("DOCSLI_TOKENS must replace the file's token list: %+v", cfg.Tokens)
+	}
+	if !cfg.Mirror.Enabled || cfg.Mirror.Remote != "backup" {
+		t.Errorf("mirror = %+v", cfg.Mirror)
+	}
+}
+
+func TestLoadEnvErrors(t *testing.T) {
+	repoDir := filepath.Join(t.TempDir(), "docs")
+
+	tests := []struct {
+		name    string
+		key     string
+		value   string
+		wantErr string
+	}{
+		{name: "malformed tokens", key: "DOCSLI_TOKENS", value: "just-a-token-no-identity", wantErr: "token:name:email"},
+		{name: "bad bool", key: "DOCSLI_MIRROR_ENABLED", value: "yep", wantErr: "not a boolean"},
+		{name: "invalid email still validated", key: "DOCSLI_TOKENS", value: "dsl_x_0123456789abcdef:X:not-an-email", wantErr: "invalid email"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			clearEnv(t)
+			t.Setenv("DOCSLI_REPO_DIR", repoDir)
+			t.Setenv(tt.key, tt.value)
+			if tt.key != "DOCSLI_TOKENS" {
+				t.Setenv("DOCSLI_TOKENS", "dsl_ok_0123456789abcdefg:OK (agent):ok-agent@example.com")
+			}
+			_, err := Load(filepath.Join(t.TempDir(), "nope.yml"))
+			if err == nil || !strings.Contains(err.Error(), tt.wantErr) {
+				t.Fatalf("want error containing %q, got: %v", tt.wantErr, err)
+			}
+		})
 	}
 }

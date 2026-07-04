@@ -61,9 +61,9 @@ Requirements: Docker with Compose.
 ```bash
 git clone https://github.com/chalvinwz/docsli.git && cd docsli
 
-# 1. Create your config: map bearer tokens to identities
-cp config.example.yml config.yml
-$EDITOR config.yml           # generate tokens with: openssl rand -hex 24
+# 1. Map bearer tokens to identities
+cp .env.example .env
+$EDITOR .env                 # generate tokens with: openssl rand -hex 24
 
 # 2. Start the server
 docker compose up -d --build
@@ -73,6 +73,20 @@ curl http://localhost:8080/healthz    # → ok
 ```
 
 On first start docsli initializes `./data/team-docs` as a git repo with a seed README and an `archive/` folder. That's it — the store is live.
+
+### Configuration
+
+Everything is configurable through environment variables — no config file needed:
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `DOCSLI_REPO_DIR` | — (required) | Directory of the docs git repo |
+| `DOCSLI_TOKENS` | — (required) | `token:name:email` entries separated by `;` |
+| `DOCSLI_LISTEN` | `:8080` | HTTP listen address |
+| `DOCSLI_MIRROR_ENABLED` | `false` | Push to a git remote after every commit |
+| `DOCSLI_MIRROR_REMOTE` | `origin` | Remote name for the mirror |
+
+Prefer a file? Mount a [`config.yml`](config.example.yml) (commented volume in `docker-compose.yml`). When both are present, the file loads first and environment variables win — handy for overriding one value per environment.
 
 ### Connect Claude Code
 
@@ -113,12 +127,10 @@ The mirror gives you an off-site backup plus GitHub's UI for humans to read docs
    git -C data/team-docs remote add origin git@github.com:you/team-docs.git
    ```
 
-4. **Enable the mirror** in `config.yml`:
+4. **Enable the mirror** — uncomment in `docker-compose.yml`:
 
    ```yaml
-   mirror:
-     enabled: true
-     remote: "origin"
+   DOCSLI_MIRROR_ENABLED: "true"
    ```
 
 5. **Mount the key** — uncomment the two lines in `docker-compose.yml`:
@@ -132,7 +144,7 @@ The mirror gives you an off-site backup plus GitHub's UI for humans to read docs
 
 6. `docker compose up -d` again. Every commit now pushes asynchronously; a 60-second ticker retries anything that failed (network down, GitHub hiccup). A failing mirror never blocks or fails an agent's write.
 
-Prefer HTTPS? Use a fine-grained PAT restricted to that single repo and set the remote URL to `https://x-access-token:<PAT>@github.com/you/team-docs.git`. Credentials always come from the environment or the remote URL — never from `config.yml`.
+Prefer HTTPS? Use a fine-grained PAT restricted to that single repo and set the remote URL to `https://x-access-token:<PAT>@github.com/you/team-docs.git`. Credentials always come from the environment or the remote URL — never from docsli's configuration.
 
 ## No lock-in, by construction
 

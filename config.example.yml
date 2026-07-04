@@ -1,4 +1,8 @@
 # docsli configuration. Copy to config.yml and adjust.
+#
+# The file is optional: everything here can also be set via DOCSLI_* env vars
+# (DOCSLI_LISTEN, DOCSLI_REPO_DIR, DOCSLI_MIRROR_ENABLED, DOCSLI_MIRROR_REMOTE,
+# DOCSLI_TOKENS="token:name:email;..."). Env vars override file values.
 
 # Address the HTTP server listens on.
 listen: ":8080"
