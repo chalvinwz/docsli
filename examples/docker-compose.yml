@@ -3,6 +3,9 @@
 #
 #   curl -O https://raw.githubusercontent.com/chalvinwz/docsli/main/examples/docker-compose.yml
 #   docker compose up -d
+#
+# Linux hosts: the container runs as uid 1000 — create the data dir first:
+#   mkdir -p data && sudo chown -R 1000:1000 data
 services:
   docsli:
     image: ghcr.io/chalvinwz/docsli:latest

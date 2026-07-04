@@ -214,6 +214,15 @@ server {
 
 ### Things to know
 
+- **Volume ownership on Linux hosts.** The container runs as non-root uid 1000, but `docker compose` creates missing bind-mount dirs as root — git then fails with `could not lock config file .git/config: Permission denied`. Before first start:
+
+  ```bash
+  mkdir -p data && sudo chown -R 1000:1000 data
+  # if mounting a mirror deploy key:
+  sudo chown 1000:1000 deploy_key && sudo chmod 600 deploy_key
+  ```
+
+  (macOS Docker Desktop/OrbStack maps bind-mount permissions transparently, which is why this only bites on Linux.)
 - **Scale up, not out.** The repo lives on local disk and writes are serialized in-process — run exactly one instance. Two replicas would each have their own repo and race the mirror.
 - **Persistence:** keep the data volume on durable disk (EBS on EC2), and enable the GitHub mirror as an off-site backup.
 - **Rate limiting** is not built in; add nginx `limit_req` or AWS WAF in front if the endpoint is internet-facing.
