@@ -1,0 +1,23 @@
+# Production compose: runs the published image from ghcr.io — no local build,
+# no cloned repo needed. See the README "Quickstart" for setup.
+#
+#   docker compose -f docker-compose.prod.yml up -d
+services:
+  docsli:
+    image: ghcr.io/chalvinwz/docsli:latest
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./data:/data
+      - ./config.yml:/config.yml:ro
+      # SSH deploy key for the GitHub mirror (see README); remove both the
+      # mount and GIT_SSH_COMMAND if you run without a mirror.
+      - ./deploy_key:/home/docsli/.ssh/id_ed25519:ro
+    environment:
+      GIT_SSH_COMMAND: ssh -i /home/docsli/.ssh/id_ed25519 -o StrictHostKeyChecking=accept-new
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://localhost:8080/healthz"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+    restart: unless-stopped

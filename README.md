@@ -79,21 +79,37 @@ Deliberately **not** in frontmatter: authors and dates. Git already records who 
 
 Requirements: Docker with Compose.
 
+### Run the published image (recommended)
+
+Multi-arch images (amd64 + arm64) are published to [ghcr.io/chalvinwz/docsli](https://github.com/chalvinwz/docsli/pkgs/container/docsli) — `latest` tracks main, semver tags track releases. No clone needed:
+
 ```bash
-git clone https://github.com/chalvinwz/docsli.git && cd docsli
+mkdir docsli && cd docsli
+curl -O https://raw.githubusercontent.com/chalvinwz/docsli/main/docker-compose.prod.yml
+curl -o config.yml https://raw.githubusercontent.com/chalvinwz/docsli/main/config.example.yml
 
-# 1. Create your config: map bearer tokens to identities
-cp config.example.yml config.yml
-$EDITOR config.yml           # generate tokens with: openssl rand -hex 24
+$EDITOR config.yml           # map tokens to identities; openssl rand -hex 24
+docker compose -f docker-compose.prod.yml up -d
 
-# 2. Start the server
-docker compose up -d --build
-
-# 3. Check it
 curl http://localhost:8080/healthz    # → ok
 ```
 
-On first start docsli initializes `./data/team-docs` as a git repo with a seed README and an `archive/` folder. That's it — the store is live.
+Running without a mirror? Delete the `deploy_key` mount and `GIT_SSH_COMMAND` lines from the compose file. With a mirror, put the deploy key at `./deploy_key` first (setup below).
+
+### Run from source (development)
+
+```bash
+git clone https://github.com/chalvinwz/docsli.git && cd docsli
+
+cp config.example.yml config.yml
+$EDITOR config.yml           # generate tokens with: openssl rand -hex 24
+
+docker compose up -d --build
+
+curl http://localhost:8080/healthz    # → ok
+```
+
+Either way, on first start docsli initializes `./data/team-docs` as a git repo with a seed README and an `archive/` folder. That's it — the store is live.
 
 ### Connect Claude Code
 
