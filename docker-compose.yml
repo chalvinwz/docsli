@@ -5,20 +5,11 @@ services:
       - "8080:8080"
     volumes:
       - ./data:/data
-      # Alternative: configure with a file instead of env vars (see
-      # config.example.yml). File values load first, DOCSLI_* env vars win.
-      # - ./config.yml:/config.yml:ro
+      - ./config.yml:/config.yml:ro
       # Optional: SSH deploy key for the GitHub mirror (see README).
       # - ./deploy_key:/home/docsli/.ssh/id_ed25519:ro
-    environment:
-      DOCSLI_REPO_DIR: /data/team-docs
-      # token:name:email entries separated by ";" — set DOCSLI_TOKENS in .env
-      # (compose loads it automatically) to keep secrets out of this file.
-      DOCSLI_TOKENS: ${DOCSLI_TOKENS}
-      # DOCSLI_LISTEN: ":8080"
-      # DOCSLI_MIRROR_ENABLED: "true"
-      # DOCSLI_MIRROR_REMOTE: origin
-      # GIT_SSH_COMMAND: ssh -i /home/docsli/.ssh/id_ed25519 -o StrictHostKeyChecking=accept-new
+    # environment:
+    #   GIT_SSH_COMMAND: ssh -i /home/docsli/.ssh/id_ed25519 -o StrictHostKeyChecking=accept-new
     healthcheck:
       test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://localhost:8080/healthz"]
       interval: 30s

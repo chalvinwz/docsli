@@ -1,7 +1,6 @@
 /bin/
 /data/
 /config.yml
-/.env
 *.test
 coverage.out
 .DS_Store
