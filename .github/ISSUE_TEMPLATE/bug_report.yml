@@ -1,0 +1,70 @@
+name: Bug report
+description: Something in docsli behaves incorrectly
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to file a bug. Please fill in the fields
+        below — complete reports get fixed faster. For questions or usage help,
+        use Discussions instead. For security issues, see SECURITY.md.
+  - type: input
+    id: version
+    attributes:
+      label: docsli version
+      description: Output of `docsli -version`, or the container image tag.
+      placeholder: "e.g. v1.0.0, ghcr.io/chalvinwz/docsli:latest (digest if you have it)"
+    validations:
+      required: true
+  - type: dropdown
+    id: install
+    attributes:
+      label: How are you running docsli?
+      options:
+        - Docker Compose with the published ghcr.io image
+        - Docker Compose built from source
+        - Bare binary (go build / go run)
+        - Other
+    validations:
+      required: true
+  - type: input
+    id: os
+    attributes:
+      label: Host OS / architecture
+      placeholder: "e.g. Ubuntu 24.04 amd64, macOS 15 arm64"
+    validations:
+      required: true
+  - type: input
+    id: client
+    attributes:
+      label: MCP client
+      description: What is calling the server?
+      placeholder: "e.g. Claude Code 2.x over streamable HTTP"
+    validations:
+      required: false
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: What you observed, and what you expected instead.
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      description: Exact steps — tool calls made, config used (redact tokens!), commands run.
+      placeholder: |
+        1. Start with `docker compose up -d` and this config (tokens redacted)...
+        2. Agent calls `doc_update` with ...
+        3. ...
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Server logs
+      description: Relevant JSON log lines from the server. Never paste bearer tokens.
+      render: text
+    validations:
+      required: false

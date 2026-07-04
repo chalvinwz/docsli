@@ -1,0 +1,40 @@
+name: Feature request
+description: Suggest an idea or enhancement for docsli
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Have an idea? Describe the problem first, then your proposed solution.
+        Check the README's Roadmap section — some ideas are already planned.
+        For open-ended discussion, consider starting a Discussion instead.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem / motivation
+      description: What are you (or your agents) trying to do that docsli makes hard or impossible today?
+    validations:
+      required: true
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed solution
+      description: What you'd like to happen. Sketch the tool schema / config / behavior if relevant.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Other approaches or workarounds you've tried or thought about.
+    validations:
+      required: false
+  - type: checkboxes
+    id: scope
+    attributes:
+      label: Scope
+      options:
+        - label: I've checked the README (including the Roadmap) and existing issues, and this isn't already covered.
+          required: true
+        - label: This fits docsli's scope (a git-backed document store for AI agents over MCP), and keeps the no-lock-in promise — the data dir stays a plain git repo.
+          required: true
