@@ -34,7 +34,7 @@
 ```
 
 - **Git is the database.** All state lives in one git repo on disk. History is `git log`, diffs are `git diff`, search is `git grep`.
-- **One write = one commit.** Every `doc_create` / `doc_update` / `doc_delete` produces exactly one commit, authored as the identity behind the caller's bearer token — e.g. `Chalvin (agent) <chalvin-agent@cohort.local>`.
+- **One write = one commit.** Every `doc_create` / `doc_update` / `doc_delete` produces exactly one commit, authored as the identity behind the caller's bearer token — e.g. `Chalvin (agent) <chalvin-agent@example.com>`.
 - **Mandatory why.** Every write requires a `why` explaining the change. It becomes the commit body, so `git log` reads like a design discussion.
 - **Soft delete only.** Deleting moves a doc to `archive/`; nothing is ever erased from history.
 - **The server is the only pusher.** An optional mirror pushes asynchronously to a private GitHub repo. Humans read there; nobody pushes back.
@@ -72,7 +72,7 @@ docker compose up -d --build
 curl http://localhost:8080/healthz    # → ok
 ```
 
-On first start docsli initializes `./data/cohort-docs` as a git repo with a seed README and an `archive/` folder. That's it — the store is live.
+On first start docsli initializes `./data/team-docs` as a git repo with a seed README and an `archive/` folder. That's it — the store is live.
 
 ### Connect Claude Code
 
@@ -90,7 +90,7 @@ Then, inside a Claude Code session:
 Every write the agent makes lands as a commit under that person's configured identity:
 
 ```
-$ git -C data/cohort-docs log --oneline
+$ git -C data/team-docs log --oneline
 9f3c2a1 update: docs/payment-prd.md      ← John (agent)
 5b81e77 create: docs/payment-prd.md      ← Chalvin (agent)
 ```
@@ -99,7 +99,7 @@ $ git -C data/cohort-docs log --oneline
 
 The mirror gives you an off-site backup plus GitHub's UI for humans to read docs and history. It is strictly one-way: docsli pushes, nobody else ever pushes to it.
 
-1. **Create a private repo**, e.g. `github.com/you/cohort-docs`. Leave it empty.
+1. **Create a private repo**, e.g. `github.com/you/team-docs`. Leave it empty.
 2. **Create a deploy key** (an SSH key scoped to just this repo):
 
    ```bash
@@ -110,7 +110,7 @@ The mirror gives you an off-site backup plus GitHub's UI for humans to read docs
 3. **Add the remote** to the data repo:
 
    ```bash
-   git -C data/cohort-docs remote add origin git@github.com:you/cohort-docs.git
+   git -C data/team-docs remote add origin git@github.com:you/team-docs.git
    ```
 
 4. **Enable the mirror** in `config.yml`:
@@ -132,14 +132,14 @@ The mirror gives you an off-site backup plus GitHub's UI for humans to read docs
 
 6. `docker compose up -d` again. Every commit now pushes asynchronously; a 60-second ticker retries anything that failed (network down, GitHub hiccup). A failing mirror never blocks or fails an agent's write.
 
-Prefer HTTPS? Use a fine-grained PAT restricted to that single repo and set the remote URL to `https://x-access-token:<PAT>@github.com/you/cohort-docs.git`. Credentials always come from the environment or the remote URL — never from `config.yml`.
+Prefer HTTPS? Use a fine-grained PAT restricted to that single repo and set the remote URL to `https://x-access-token:<PAT>@github.com/you/team-docs.git`. Credentials always come from the environment or the remote URL — never from `config.yml`.
 
 ## No lock-in, by construction
 
 The data directory is an ordinary git repository of markdown files. At any moment you can:
 
 ```bash
-cd data/cohort-docs
+cd data/team-docs
 git log --stat           # the full audit trail
 git blame docs/prd.md    # who wrote which line, agent by agent
 git checkout HEAD~5 -- docs/prd.md   # any historical version

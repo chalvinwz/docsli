@@ -13,8 +13,8 @@ import (
 )
 
 var testTokens = []config.TokenEntry{
-	{Token: "dsl_john_0123456789abcdef", Name: "John (agent)", Email: "john-agent@cohort.local"},
-	{Token: "dsl_joe_0123456789abcdefgh", Name: "Joe (agent)", Email: "joe-agent@cohort.local"},
+	{Token: "dsl_john_0123456789abcdef", Name: "John (agent)", Email: "john-agent@example.com"},
+	{Token: "dsl_joe_0123456789abcdefgh", Name: "Joe (agent)", Email: "joe-agent@example.com"},
 }
 
 func TestVerifier(t *testing.T) {
@@ -24,7 +24,7 @@ func TestVerifier(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if info.Extra["name"] != "Joe (agent)" || info.Extra["email"] != "joe-agent@cohort.local" {
+	if info.Extra["name"] != "Joe (agent)" || info.Extra["email"] != "joe-agent@example.com" {
 		t.Errorf("identity = %v", info.Extra)
 	}
 	if info.Expiration.IsZero() {

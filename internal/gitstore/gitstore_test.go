@@ -11,8 +11,8 @@ import (
 )
 
 var (
-	john = Identity{Name: "John (agent)", Email: "john-agent@cohort.local"}
-	joe  = Identity{Name: "Joe (agent)", Email: "joe-agent@cohort.local"}
+	john = Identity{Name: "John (agent)", Email: "john-agent@example.com"}
+	joe  = Identity{Name: "Joe (agent)", Email: "joe-agent@example.com"}
 )
 
 // seedDoc commits a document directly via git, bypassing the write path, so

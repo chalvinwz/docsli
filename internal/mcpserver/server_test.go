@@ -22,8 +22,8 @@ const (
 )
 
 var testTokens = []config.TokenEntry{
-	{Token: johnToken, Name: "John (agent)", Email: "john-agent@cohort.local"},
-	{Token: joeToken, Name: "Joe (agent)", Email: "joe-agent@cohort.local"},
+	{Token: johnToken, Name: "John (agent)", Email: "john-agent@example.com"},
+	{Token: joeToken, Name: "Joe (agent)", Email: "joe-agent@example.com"},
 }
 
 // newTestServer boots the full production stack — gitstore on a temp repo,

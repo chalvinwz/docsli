@@ -5,11 +5,11 @@ listen: ":8080"
 
 # Directory holding the docs git repository. Created and initialized on first
 # start if it is not a git repo yet. The parent directory must already exist.
-repo_dir: "./data/cohort-docs"
+repo_dir: "./data/team-docs"
 
 # Optional one-way mirror: after every commit the server pushes to this remote.
 # The remote must already be configured inside the repo, e.g.:
-#   git -C ./data/cohort-docs remote add origin git@github.com:you/cohort-docs.git
+#   git -C ./data/team-docs remote add origin git@github.com:you/team-docs.git
 # Credentials come from the environment (SSH key / credential helper), never
 # from this file.
 mirror:
@@ -21,7 +21,7 @@ mirror:
 tokens:
   - token: "dsl_chalvin_replace_me_0000"
     name: "Chalvin (agent)"
-    email: "chalvin-agent@cohort.local"
+    email: "chalvin-agent@example.com"
   - token: "dsl_john_replace_me_000000"
     name: "John (agent)"
-    email: "john-agent@cohort.local"
+    email: "john-agent@example.com"

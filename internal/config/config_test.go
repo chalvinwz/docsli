@@ -20,10 +20,10 @@ const validTokens = `
 tokens:
   - token: "dsl_chalvin_0123456789abcdef"
     name: "Chalvin (agent)"
-    email: "chalvin-agent@cohort.local"
+    email: "chalvin-agent@example.com"
   - token: "dsl_john_0123456789abcdef"
     name: "John (agent)"
-    email: "john-agent@cohort.local"
+    email: "john-agent@example.com"
 `
 
 func TestLoad(t *testing.T) {
@@ -63,10 +63,10 @@ func TestLoad(t *testing.T) {
 tokens:
   - token: "dsl_same_0123456789abcdef"
     name: "A"
-    email: "a@cohort.local"
+    email: "a@example.com"
   - token: "dsl_same_0123456789abcdef"
     name: "B"
-    email: "b@cohort.local"
+    email: "b@example.com"
 `,
 			wantErr: "duplicate token",
 		},
@@ -76,7 +76,7 @@ tokens:
 tokens:
   - token: "short"
     name: "A"
-    email: "a@cohort.local"
+    email: "a@example.com"
 `,
 			wantErr: "at least 16 characters",
 		},
@@ -96,7 +96,7 @@ tokens:
 tokens:
   - token: "dsl_a_0123456789abcdef"
     name: ""
-    email: "a@cohort.local"
+    email: "a@example.com"
 `,
 			wantErr: "name is required",
 		},
