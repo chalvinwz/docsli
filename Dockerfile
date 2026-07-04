@@ -6,7 +6,7 @@ COPY . .
 ARG VERSION=dev
 RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w -X main.version=${VERSION}" -o /out/docsli ./cmd/docsli
 
-FROM alpine:3.22
+FROM alpine:3.24
 RUN apk add --no-cache git openssh-client ca-certificates \
     && adduser -D -u 1000 docsli
 # Bind-mounted volumes are usually owned by the host user, not uid 1000;
