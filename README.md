@@ -298,6 +298,10 @@ Deliberately out of v1 — the current design keeps them possible:
 - User-management endpoints and metrics
 - Prebuilt binaries (goreleaser)
 
+## Contributing
+
+Contributions welcome — see [CONTRIBUTING.md](CONTRIBUTING.md) for the workflow (trunk-based, PR-only, squash merges) and project conventions. Security issues go through [private vulnerability reporting](SECURITY.md), never public issues.
+
 ## License
 
 [MIT](LICENSE)
