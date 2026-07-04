@@ -33,8 +33,11 @@ func TestCreate(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if doc.Content != "# PRD\n\nBody.\n" {
-		t.Errorf("content = %q", doc.Content)
+	if doc.Content != defaultFrontmatter+"# PRD\n\nBody.\n" {
+		t.Errorf("content = %q, want injected draft frontmatter + original body", doc.Content)
+	}
+	if doc.Meta.Status != "draft" {
+		t.Errorf("meta = %+v, want auto-injected draft status", doc.Meta)
 	}
 	if out := gitOut(t, s, "status", "--porcelain"); out != "" {
 		t.Errorf("worktree dirty after create:\n%s", out)
@@ -50,8 +53,51 @@ func TestCreateNormalizesTrailingNewline(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if doc.Content != "no newline\n" {
+	if doc.Content != defaultFrontmatter+"no newline\n" {
 		t.Errorf("content = %q, want trailing newline added", doc.Content)
+	}
+}
+
+func TestCreateKeepsExplicitFrontmatter(t *testing.T) {
+	s := newTestStore(t)
+	content := "---\nstatus: approved\ntags: [payments, adr]\ntype: adr\n---\n\n# Decision\n"
+	if err := s.Create("docs/adr-001.md", content, "record an approved decision with metadata", john); err != nil {
+		t.Fatal(err)
+	}
+	doc, err := s.Read("docs/adr-001.md")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if doc.Content != content {
+		t.Errorf("explicit frontmatter must be stored verbatim, got %q", doc.Content)
+	}
+	if doc.Meta.Status != "approved" || doc.Meta.Type != "adr" || len(doc.Meta.Tags) != 2 {
+		t.Errorf("meta = %+v", doc.Meta)
+	}
+}
+
+func TestCreateRejectsInvalidFrontmatter(t *testing.T) {
+	s := newTestStore(t)
+	tests := []struct {
+		name    string
+		content string
+	}{
+		{name: "bad status", content: "---\nstatus: wip\n---\n\nx\n"},
+		{name: "bad type", content: "---\nstatus: draft\ntype: memo\n---\n\nx\n"},
+		{name: "unknown key", content: "---\nstatus: draft\nauthor: someone\n---\n\nx\n"},
+		{name: "unclosed block", content: "---\nstatus: draft\n\nx\n"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := s.Create("docs/bad.md", tt.content, "attempt create with invalid frontmatter", john)
+			var ve *ValidationError
+			if !errors.As(err, &ve) {
+				t.Fatalf("want ValidationError, got %v", err)
+			}
+		})
+	}
+	if n := commitCount(t, s); n != 1 {
+		t.Errorf("rejected creates must not commit; count = %d", n)
 	}
 }
 
@@ -100,7 +146,7 @@ func TestUpdate(t *testing.T) {
 	s := newTestStore(t)
 	mustCreate(t, s, "docs/a.md", "v1\n")
 
-	if err := s.Update("docs/a.md", "v2\n", "revise after review feedback", "", joe); err != nil {
+	if err := s.Update("docs/a.md", defaultFrontmatter+"v2\n", "revise after review feedback", "", joe); err != nil {
 		t.Fatal(err)
 	}
 
@@ -108,7 +154,7 @@ func TestUpdate(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if doc.Content != "v2\n" {
+	if doc.Content != defaultFrontmatter+"v2\n" {
 		t.Errorf("content = %q, want full replacement", doc.Content)
 	}
 	name, _, subject, body := lastCommitMeta(t, s)
@@ -133,7 +179,7 @@ func TestUpdateNoChange(t *testing.T) {
 	s := newTestStore(t)
 	mustCreate(t, s, "docs/a.md", "same\n")
 
-	err := s.Update("docs/a.md", "same\n", "no-op update with identical content", "", joe)
+	err := s.Update("docs/a.md", defaultFrontmatter+"same\n", "no-op update with identical content", "", joe)
 	var nc *NoChangeError
 	if !errors.As(err, &nc) {
 		t.Fatalf("want NoChangeError, got %v", err)
@@ -152,17 +198,17 @@ func TestUpdateExpectedRev(t *testing.T) {
 	staleRev := gitOut(t, s, "rev-parse", "--short", "HEAD")
 
 	// Matching rev succeeds.
-	if err := s.Update("docs/a.md", "v2\n", "update with correct expected rev", "", joe); err != nil {
+	if err := s.Update("docs/a.md", defaultFrontmatter+"v2\n", "update with correct expected rev", "", joe); err != nil {
 		t.Fatal(err)
 	}
 	currentRev := gitOut(t, s, "rev-parse", "--short", "HEAD")
-	if err := s.Update("docs/a.md", "v3\n", "update guarded by current rev", currentRev, john); err != nil {
+	if err := s.Update("docs/a.md", defaultFrontmatter+"v3\n", "update guarded by current rev", currentRev, john); err != nil {
 		t.Fatalf("update with matching expected_rev: %v", err)
 	}
 
 	// Stale rev conflicts and changes nothing.
 	before := commitCount(t, s)
-	err := s.Update("docs/a.md", "v4\n", "update guarded by stale rev", staleRev, joe)
+	err := s.Update("docs/a.md", defaultFrontmatter+"v4\n", "update guarded by stale rev", staleRev, joe)
 	var ce *ConflictError
 	if !errors.As(err, &ce) {
 		t.Fatalf("want ConflictError, got %v", err)
@@ -177,8 +223,25 @@ func TestUpdateExpectedRev(t *testing.T) {
 		t.Error("conflicted update must not commit")
 	}
 	doc, _ := s.Read("docs/a.md")
-	if doc.Content != "v3\n" {
+	if doc.Content != defaultFrontmatter+"v3\n" {
 		t.Errorf("conflicted update must not change content, got %q", doc.Content)
+	}
+}
+
+func TestUpdateRequiresFrontmatter(t *testing.T) {
+	s := newTestStore(t)
+	mustCreate(t, s, "docs/a.md", "v1\n")
+
+	err := s.Update("docs/a.md", "v2 without frontmatter\n", "update that drops the metadata block", "", joe)
+	var ve *ValidationError
+	if !errors.As(err, &ve) {
+		t.Fatalf("want ValidationError, got %v", err)
+	}
+	if !strings.Contains(err.Error(), "frontmatter") {
+		t.Errorf("error should tell the agent about frontmatter: %v", err)
+	}
+	if n := commitCount(t, s); n != 2 {
+		t.Errorf("rejected update must not commit; count = %d", n)
 	}
 }
 
@@ -198,7 +261,7 @@ func TestDelete(t *testing.T) {
 		t.Error("original path must be gone from the worktree")
 	}
 
-	docs, err := s.List("")
+	docs, err := s.List(ListQuery{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -213,7 +276,7 @@ func TestDelete(t *testing.T) {
 	if err != nil {
 		t.Fatalf("archived doc must stay readable: %v", err)
 	}
-	if doc.Content != "# Old\n" {
+	if doc.Content != defaultFrontmatter+"# Old\n" {
 		t.Errorf("archived content = %q", doc.Content)
 	}
 	if out := gitOut(t, s, "status", "--porcelain"); out != "" {
@@ -254,7 +317,7 @@ func TestDeleteArchiveCollision(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	docs, err := s.List("archive")
+	docs, err := s.List(ListQuery{Folder: "archive"})
 	if err != nil {
 		t.Fatal(err)
 	}

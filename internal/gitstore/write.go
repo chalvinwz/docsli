@@ -26,6 +26,13 @@ func (s *GitStore) Create(path, content, why string, author Identity) error {
 	ctx, cancel := s.opCtx()
 	defer cancel()
 
+	// Frontmatter is required; a doc created without one starts as a draft.
+	if _, _, found, fmErr := parseFrontmatter(content); fmErr != nil {
+		return fmErr
+	} else if !found {
+		content = defaultFrontmatter + content
+	}
+
 	exists, err := s.pathInHead(ctx, path)
 	if err != nil {
 		return err
@@ -70,6 +77,18 @@ func (s *GitStore) Update(path, content, why, expectedRev string, author Identit
 	if expectedRev != "" {
 		if err := s.checkExpectedRev(ctx, path, expectedRev); err != nil {
 			return err
+		}
+	}
+
+	// Updates never invent metadata: the agent read the doc, so it must send
+	// the frontmatter back (adjusted if the change calls for it). Checked
+	// after existence so a missing doc still reads as "not found".
+	if _, _, found, fmErr := parseFrontmatter(content); fmErr != nil {
+		return fmErr
+	} else if !found {
+		return &ValidationError{
+			Field:  "content",
+			Reason: "document must start with its frontmatter block (---); doc_read the current version and preserve or update its metadata",
 		}
 	}
 

@@ -33,6 +33,9 @@ func (h *handlers) lastRev(path string) string {
 
 type docListIn struct {
 	Folder string `json:"folder,omitempty" jsonschema:"Optional subfolder to list, e.g. 'docs'. Pass 'archive' to list soft-deleted docs. Empty lists everything except the archive."`
+	Status string `json:"status,omitempty" jsonschema:"Filter by lifecycle status: draft, in-review, approved, or superseded."`
+	Tag    string `json:"tag,omitempty" jsonschema:"Filter to docs whose frontmatter tags include this tag (case-insensitive)."`
+	Type   string `json:"type,omitempty" jsonschema:"Filter by document type: prd, adr, proposal, or note."`
 }
 
 type docListOut struct {
@@ -41,7 +44,12 @@ type docListOut struct {
 }
 
 func (h *handlers) docList(_ context.Context, _ *mcp.CallToolRequest, in docListIn) (*mcp.CallToolResult, docListOut, error) {
-	docs, err := h.store.List(in.Folder)
+	docs, err := h.store.List(gitstore.ListQuery{
+		Folder: in.Folder,
+		Status: in.Status,
+		Tag:    in.Tag,
+		Type:   in.Type,
+	})
 	if err != nil {
 		return nil, docListOut{}, err
 	}
@@ -87,7 +95,7 @@ type writeOut struct {
 
 type docCreateIn struct {
 	Path    string `json:"path" jsonschema:"Repo-relative path for the new document, must end in .md, e.g. docs/payment-prd.md. Parent folders are created automatically."`
-	Content string `json:"content" jsonschema:"Full markdown content of the document. Start with a '# Title' heading so listings show a meaningful title."`
+	Content string `json:"content" jsonschema:"Full markdown content. Optionally start with a YAML frontmatter block (--- status: draft ... ---) carrying status (draft/in-review/approved/superseded) plus optional tags and type (prd/adr/proposal/note); omit it and the doc starts as status: draft automatically. After the frontmatter, begin with a '# Title' heading so listings show a meaningful title."`
 	Why     string `json:"why" jsonschema:"One or two sentences explaining WHY this document is being created. Becomes the permanent git commit message visible to all collaborators. Minimum 10 characters."`
 }
 
@@ -105,7 +113,7 @@ func (h *handlers) docCreate(_ context.Context, req *mcp.CallToolRequest, in doc
 
 type docUpdateIn struct {
 	Path        string `json:"path" jsonschema:"Repo-relative path of the existing document to update."`
-	Content     string `json:"content" jsonschema:"The COMPLETE new markdown content. This replaces the whole document, so include everything that should remain, not just your changes."`
+	Content     string `json:"content" jsonschema:"The COMPLETE new markdown content, INCLUDING the frontmatter block from your doc_read (update its status/tags/type if the change calls for it). This replaces the whole document, so include everything that should remain, not just your changes."`
 	Why         string `json:"why" jsonschema:"One or two sentences explaining WHY you are making this change. Becomes the permanent git commit message. Minimum 10 characters."`
 	ExpectedRev string `json:"expected_rev,omitempty" jsonschema:"Strongly recommended: the last_commit.short_hash you got from doc_read. If the doc changed since, the update is rejected with the current revision instead of overwriting someone else's work. Omit to force last-write-wins."`
 }

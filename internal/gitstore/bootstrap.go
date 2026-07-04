@@ -16,7 +16,12 @@ const (
 	opTimeout   = 30 * time.Second
 )
 
-const seedReadme = `# Docs
+const seedReadme = `---
+status: approved
+type: note
+---
+
+# Docs
 
 This repository is managed by [docsli](https://github.com/chalvinwz/docsli).
 Every change is an ordinary git commit: browse history with ` + "`git log`" + `,

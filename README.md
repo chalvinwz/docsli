@@ -43,8 +43,8 @@
 
 | Tool | What it does |
 |---|---|
-| `doc_list` | List docs with title, last-modified, last author. Archive hidden unless requested. |
-| `doc_read` | Full content + last commit (author, date, why, revision). |
+| `doc_list` | List docs with title, metadata, created/last-edited author+date. Filter by status, tag, or type. Archive hidden unless requested. |
+| `doc_read` | Full content + parsed metadata + last commit (author, date, why, revision). |
 | `doc_search` | Case-insensitive full-text search across non-archived docs. |
 | `doc_create` | Create a new doc. Fails if it exists. Requires `why`. |
 | `doc_update` | Replace a doc's full content. Optional `expected_rev` for conflict detection. Requires `why`. |
@@ -53,6 +53,27 @@
 | `doc_diff` | Unified diff of one doc between two revisions. |
 
 Concurrent writes are serialized server-side, and `doc_update` supports **optimistic locking**: agents pass the revision they read (`expected_rev`), and the server rejects the update with a helpful conflict message if someone changed the doc in between — no silent overwrites, and the losing agent knows exactly how to recover.
+
+## Document metadata
+
+Every document carries a YAML frontmatter block, validated on every write:
+
+```markdown
+---
+status: in-review        # draft | in-review | approved | superseded (required)
+tags: [payments, q3]     # optional
+type: prd                # prd | adr | proposal | note (optional)
+---
+
+# Payment PRD
+...
+```
+
+- `doc_create` without a frontmatter block auto-injects `status: draft`; invalid metadata is rejected with an error that tells the agent how to fix it.
+- `doc_update` must send the frontmatter back (adjusted when the change calls for it) — updates never silently invent or drop metadata.
+- `doc_list` filters on it: *"list all approved ADRs tagged payments"* is one tool call.
+
+Deliberately **not** in frontmatter: authors and dates. Git already records who created and last edited every doc — `doc_list` exposes `created`/`created_by`/`last_modified`/`last_author` straight from commit history, so that data can never drift from reality.
 
 ## Quickstart
 
@@ -214,7 +235,7 @@ Deliberately out of v1 — the current design keeps them possible:
 - Web UI for browsing docs and history
 - PR/review mode (propose on a branch, human merges)
 - Branch support and richer merge-conflict handling
-- YAML frontmatter (owners, status, tags)
+- Custom frontmatter schemas (owner links, ticket refs, arbitrary keys)
 - Semantic / vector search
 - Multi-repo support
 - User-management endpoints and metrics

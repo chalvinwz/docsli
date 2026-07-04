@@ -18,10 +18,10 @@ import (
 // by \x1e. The record separator is load-bearing: %b bodies are multiline.
 const historyFormat = "--format=%H%x00%h%x00%an%x00%ae%x00%aI%x00%s%x00%b%x1e"
 
-// List returns metadata for every document under folder ("" = whole repo).
-// archive/ is excluded unless folder points into it.
-func (s *GitStore) List(folder string) ([]DocMeta, error) {
-	folder = strings.Trim(folder, "/")
+// List returns metadata for documents matching q. An empty query lists the
+// whole repo; archive/ is excluded unless q.Folder points into it.
+func (s *GitStore) List(q ListQuery) ([]DocMeta, error) {
+	folder := strings.Trim(q.Folder, "/")
 	if folder != "" {
 		if err := validateFolder(folder); err != nil {
 			return nil, err
@@ -61,15 +61,45 @@ func (s *GitStore) List(folder string) ([]DocMeta, error) {
 
 	docs := make([]DocMeta, 0, len(paths))
 	for _, p := range paths {
+		title, meta := s.docInfo(p)
+		if !matchesQuery(meta, q) {
+			continue
+		}
 		ch := changes[p]
 		docs = append(docs, DocMeta{
 			Path:         p,
-			Title:        s.titleOf(p),
+			Title:        title,
+			Meta:         meta,
+			Created:      ch.created,
+			CreatedBy:    ch.createdBy,
 			LastModified: ch.date,
 			LastAuthor:   ch.author,
 		})
 	}
 	return docs, nil
+}
+
+// matchesQuery applies the frontmatter filters, case-insensitively.
+func matchesQuery(meta Meta, q ListQuery) bool {
+	if q.Status != "" && !strings.EqualFold(meta.Status, q.Status) {
+		return false
+	}
+	if q.Type != "" && !strings.EqualFold(meta.Type, q.Type) {
+		return false
+	}
+	if q.Tag != "" {
+		found := false
+		for _, tag := range meta.Tags {
+			if strings.EqualFold(tag, q.Tag) {
+				found = true
+				break
+			}
+		}
+		if !found {
+			return false
+		}
+	}
+	return true
 }
 
 // validateFolder checks a listing folder: same hygiene as document paths but
@@ -96,13 +126,15 @@ func validateFolder(folder string) error {
 }
 
 type changeInfo struct {
-	author string
-	date   time.Time
+	author    string
+	date      time.Time
+	createdBy string
+	created   time.Time
 }
 
-// lastChanges resolves last author and date for all paths in ONE git log
-// walk instead of one subprocess per file. The first (newest) commit block
-// naming a path wins; the walk stops early once every path is annotated.
+// lastChanges resolves, for all paths in ONE git log walk instead of one
+// subprocess per file: who last touched each path (newest commit naming it)
+// and who created it (oldest commit naming it).
 func (s *GitStore) lastChanges(ctx context.Context, paths []string) (map[string]changeInfo, error) {
 	if len(paths) == 0 {
 		return nil, nil
@@ -117,11 +149,9 @@ func (s *GitStore) lastChanges(ctx context.Context, paths []string) (map[string]
 	}
 
 	info := make(map[string]changeInfo, len(paths))
-	remaining := len(paths)
+	// Blocks arrive newest first: first sighting fixes the last-edit fields,
+	// every later sighting overwrites the creation fields, so the oldest wins.
 	for _, block := range strings.Split(out, "\x01") {
-		if remaining == 0 {
-			break
-		}
 		lines := strings.Split(block, "\n")
 		header := strings.SplitN(lines[0], "\x00", 2)
 		if len(header) != 2 {
@@ -135,34 +165,46 @@ func (s *GitStore) lastChanges(ctx context.Context, paths []string) (map[string]
 			if f == "" || !want[f] {
 				continue
 			}
-			if _, done := info[f]; done {
-				continue
+			ci, seen := info[f]
+			if !seen {
+				ci.author, ci.date = header[0], date
 			}
-			info[f] = changeInfo{author: header[0], date: date}
-			remaining--
+			ci.createdBy, ci.created = header[0], date
+			info[f] = ci
 		}
 	}
 	return info, nil
 }
 
-// titleOf returns the first "# " heading of the worktree file, or the
-// filename without extension. Only the first 4KB are examined.
-func (s *GitStore) titleOf(path string) string {
+// docInfo returns the doc's title (first "# " heading of the body, or the
+// filename) and its frontmatter. Reads are tolerant: a doc without valid
+// frontmatter — e.g. pre-existing files — yields zero Meta, never an error.
+// Only the first 8KB are examined.
+func (s *GitStore) docInfo(path string) (string, Meta) {
 	fallback := strings.TrimSuffix(filepath.Base(path), ".md")
 	f, err := os.Open(filepath.Join(s.dir, path))
 	if err != nil {
-		return fallback
+		return fallback, Meta{}
 	}
 	defer func() { _ = f.Close() }()
 
-	sc := bufio.NewScanner(io.LimitReader(f, 4096))
+	raw, err := io.ReadAll(io.LimitReader(f, 8192))
+	if err != nil {
+		return fallback, Meta{}
+	}
+	meta, body, _, err := parseFrontmatter(string(raw))
+	if err != nil {
+		meta, body = Meta{}, string(raw)
+	}
+
+	sc := bufio.NewScanner(strings.NewReader(body))
 	for sc.Scan() {
 		line := strings.TrimSpace(sc.Text())
 		if title, ok := strings.CutPrefix(line, "# "); ok {
-			return strings.TrimSpace(title)
+			return strings.TrimSpace(title), meta
 		}
 	}
-	return fallback
+	return fallback, meta
 }
 
 // Read returns the committed content of path plus its last commit. Archived
@@ -187,7 +229,12 @@ func (s *GitStore) Read(path string) (Doc, error) {
 	if err != nil {
 		return Doc{}, err
 	}
-	return Doc{Path: path, Content: content, LastCommit: commits[0]}, nil
+	// Tolerant on read: invalid or absent frontmatter yields zero Meta.
+	meta, _, _, err := parseFrontmatter(content)
+	if err != nil {
+		meta = Meta{}
+	}
+	return Doc{Path: path, Content: content, Meta: meta, LastCommit: commits[0]}, nil
 }
 
 func isMissingPathErr(err error) bool {

@@ -137,16 +137,21 @@ func TestTwoAgentCollaboration(t *testing.T) {
 	}
 	var doc gitstore.Doc
 	structured(t, res, &doc)
-	if doc.Content != "# Payment PRD\n\nDraft v1.\n" {
+	// Server injects draft frontmatter when the creator omitted it.
+	if doc.Content != "---\nstatus: draft\n---\n\n# Payment PRD\n\nDraft v1.\n" {
 		t.Errorf("content = %q", doc.Content)
+	}
+	if doc.Meta.Status != "draft" {
+		t.Errorf("meta = %+v, want injected draft status", doc.Meta)
 	}
 	if doc.LastCommit.AuthorName != "John (agent)" {
 		t.Errorf("last author = %q, want John", doc.LastCommit.AuthorName)
 	}
 
+	// Joe edits like an agent would: keep the frontmatter block, bump status.
 	res = callTool(t, joeSess, "doc_update", map[string]any{
 		"path":         "docs/payment-prd.md",
-		"content":      "# Payment PRD\n\nDraft v2 with Joe's edits.\n",
+		"content":      "---\nstatus: in-review\n---\n\n# Payment PRD\n\nDraft v2 with Joe's edits.\n",
 		"why":          "add risk analysis after reviewing the draft",
 		"expected_rev": doc.LastCommit.ShortHash,
 	})
@@ -215,11 +220,11 @@ func TestConflictSurfacesToAgent(t *testing.T) {
 	staleRev := doc.LastCommit.ShortHash
 
 	callTool(t, sess, "doc_update", map[string]any{
-		"path": "docs/c.md", "content": "v2\n", "why": "someone else edits in between",
+		"path": "docs/c.md", "content": "---\nstatus: draft\n---\n\nv2\n", "why": "someone else edits in between",
 	})
 
 	res = callTool(t, sess, "doc_update", map[string]any{
-		"path": "docs/c.md", "content": "v3\n", "why": "guarded update with stale rev",
+		"path": "docs/c.md", "content": "---\nstatus: draft\n---\n\nv3\n", "why": "guarded update with stale rev",
 		"expected_rev": staleRev,
 	})
 	if !res.IsError {

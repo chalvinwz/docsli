@@ -12,10 +12,14 @@ type Identity struct {
 	Email string
 }
 
-// DocMeta describes a document in a listing.
+// DocMeta describes a document in a listing. Authorship fields are derived
+// from git history, never stored in the document itself.
 type DocMeta struct {
 	Path         string    `json:"path"`
 	Title        string    `json:"title"`
+	Meta         Meta      `json:"meta"`
+	Created      time.Time `json:"created"`
+	CreatedBy    string    `json:"created_by"`
 	LastModified time.Time `json:"last_modified"`
 	LastAuthor   string    `json:"last_author"`
 }
@@ -24,7 +28,17 @@ type DocMeta struct {
 type Doc struct {
 	Path       string `json:"path"`
 	Content    string `json:"content"`
+	Meta       Meta   `json:"meta"`
 	LastCommit Commit `json:"last_commit"`
+}
+
+// ListQuery narrows a listing. Zero value lists every non-archived doc.
+// Status, Tag, and Type match frontmatter fields case-insensitively.
+type ListQuery struct {
+	Folder string
+	Status string
+	Tag    string
+	Type   string
 }
 
 // SearchHit is one matching line from a full-text search.
@@ -48,7 +62,7 @@ type Commit struct {
 // Store is the full document-store contract. All writes produce exactly one
 // commit authored as the given identity, with why as the commit message body.
 type Store interface {
-	List(folder string) ([]DocMeta, error)
+	List(q ListQuery) ([]DocMeta, error)
 	Read(path string) (Doc, error)
 	Search(query string) ([]SearchHit, error)
 	Create(path, content, why string, author Identity) error

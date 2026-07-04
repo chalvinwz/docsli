@@ -13,7 +13,7 @@ func TestList(t *testing.T) {
 	seedDoc(t, s, "notes/scratch.md", "no heading, edited\n", joe, "update: notes/scratch.md", "joe refines the notes")
 	seedDoc(t, s, "archive/old.md", "# Old\n", john, "archive: old.md", "seed an archived doc")
 
-	docs, err := s.List("")
+	docs, err := s.List(ListQuery{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -42,8 +42,14 @@ func TestList(t *testing.T) {
 	if scratch.LastAuthor != joe.Name {
 		t.Errorf("scratch last author = %q, want %q (latest committer)", scratch.LastAuthor, joe.Name)
 	}
-	if scratch.LastModified.IsZero() {
-		t.Error("LastModified not populated")
+	if scratch.CreatedBy != john.Name {
+		t.Errorf("scratch created_by = %q, want %q (original committer)", scratch.CreatedBy, john.Name)
+	}
+	if scratch.LastModified.IsZero() || scratch.Created.IsZero() {
+		t.Error("LastModified/Created not populated")
+	}
+	if scratch.Created.After(scratch.LastModified) {
+		t.Errorf("created %v after last modified %v", scratch.Created, scratch.LastModified)
 	}
 }
 
@@ -52,7 +58,7 @@ func TestListFolderFilter(t *testing.T) {
 	seedDoc(t, s, "docs/a.md", "# A\n", john, "create: docs/a.md", "seed doc a for tests")
 	seedDoc(t, s, "notes/b.md", "# B\n", john, "create: notes/b.md", "seed doc b for tests")
 
-	docs, err := s.List("docs")
+	docs, err := s.List(ListQuery{Folder: "docs"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -61,11 +67,63 @@ func TestListFolderFilter(t *testing.T) {
 	}
 }
 
+func TestListMetadataFilters(t *testing.T) {
+	s := newTestStore(t)
+	mustCreate(t, s, "docs/draft-note.md", "# Draft\n") // auto-injected draft
+	if err := s.Create("docs/adr-001.md",
+		"---\nstatus: approved\ntags: [Payments]\ntype: adr\n---\n\n# ADR 001\n",
+		"seed an approved adr for filter tests", john); err != nil {
+		t.Fatal(err)
+	}
+
+	byStatus, err := s.List(ListQuery{Status: "approved"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Seed README is approved too, so look for exactly our adr among them.
+	foundADR := false
+	for _, d := range byStatus {
+		if d.Meta.Status != "approved" {
+			t.Errorf("status filter leaked %+v", d)
+		}
+		if d.Path == "docs/adr-001.md" {
+			foundADR = true
+		}
+	}
+	if !foundADR {
+		t.Error("approved filter missed docs/adr-001.md")
+	}
+
+	byTag, err := s.List(ListQuery{Tag: "payments"}) // case-insensitive
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(byTag) != 1 || byTag[0].Path != "docs/adr-001.md" {
+		t.Errorf("tag filter = %+v, want just the adr", byTag)
+	}
+
+	byType, err := s.List(ListQuery{Type: "adr"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(byType) != 1 || byType[0].Path != "docs/adr-001.md" {
+		t.Errorf("type filter = %+v, want just the adr", byType)
+	}
+
+	drafts, err := s.List(ListQuery{Status: "draft"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(drafts) != 1 || drafts[0].Path != "docs/draft-note.md" {
+		t.Errorf("draft filter = %+v, want just the injected-draft doc", drafts)
+	}
+}
+
 func TestListArchiveFolder(t *testing.T) {
 	s := newTestStore(t)
 	seedDoc(t, s, "archive/old.md", "# Old\n", john, "archive: old.md", "seed archived doc")
 
-	docs, err := s.List("archive")
+	docs, err := s.List(ListQuery{Folder: "archive"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -76,7 +134,7 @@ func TestListArchiveFolder(t *testing.T) {
 
 func TestListRejectsTraversal(t *testing.T) {
 	s := newTestStore(t)
-	if _, err := s.List("../outside"); err == nil {
+	if _, err := s.List(ListQuery{Folder: "../outside"}); err == nil {
 		t.Error("List with traversal folder must fail")
 	}
 }

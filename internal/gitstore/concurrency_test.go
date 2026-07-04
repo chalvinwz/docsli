@@ -37,7 +37,7 @@ func TestConcurrentWrites(t *testing.T) {
 	if out := gitOut(t, s, "status", "--porcelain"); out != "" {
 		t.Errorf("worktree dirty after concurrent writes:\n%s", out)
 	}
-	docs, err := s.List("docs")
+	docs, err := s.List(ListQuery{Folder: "docs"})
 	if err != nil {
 		t.Fatal(err)
 	}
