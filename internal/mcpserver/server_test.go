@@ -17,13 +17,13 @@ import (
 )
 
 const (
-	aliceToken = "dsl_alice_0123456789abcdef"
-	bobToken   = "dsl_bob_0123456789abcdefgh"
+	johnToken = "dsl_john_0123456789abcdef"
+	joeToken  = "dsl_joe_0123456789abcdefgh"
 )
 
 var testTokens = []config.TokenEntry{
-	{Token: aliceToken, Name: "Alice (agent)", Email: "alice-agent@cohort.local"},
-	{Token: bobToken, Name: "Bob (agent)", Email: "bob-agent@cohort.local"},
+	{Token: johnToken, Name: "John (agent)", Email: "john-agent@cohort.local"},
+	{Token: joeToken, Name: "Joe (agent)", Email: "joe-agent@cohort.local"},
 }
 
 // newTestServer boots the full production stack — gitstore on a temp repo,
@@ -107,15 +107,15 @@ func errorText(res *mcp.CallToolResult) string {
 	return b.String()
 }
 
-// TestTwoAgentCollaboration is the definition-of-done in miniature: Alice
-// creates a PRD, Bob updates it, and doc_history shows both commits with
+// TestTwoAgentCollaboration is the definition-of-done in miniature: John
+// creates a PRD, Joe updates it, and doc_history shows both commits with
 // distinct authors and their why messages.
 func TestTwoAgentCollaboration(t *testing.T) {
 	ts := newTestServer(t)
-	aliceSess := connect(t, ts, aliceToken)
-	bobSess := connect(t, ts, bobToken)
+	johnSess := connect(t, ts, johnToken)
+	joeSess := connect(t, ts, joeToken)
 
-	res := callTool(t, aliceSess, "doc_create", map[string]any{
+	res := callTool(t, johnSess, "doc_create", map[string]any{
 		"path":    "docs/payment-prd.md",
 		"content": "# Payment PRD\n\nDraft v1.\n",
 		"why":     "kick off the payments project with a first PRD draft",
@@ -131,7 +131,7 @@ func TestTwoAgentCollaboration(t *testing.T) {
 		t.Error("create result missing rev")
 	}
 
-	res = callTool(t, bobSess, "doc_read", map[string]any{"path": "docs/payment-prd.md"})
+	res = callTool(t, joeSess, "doc_read", map[string]any{"path": "docs/payment-prd.md"})
 	if res.IsError {
 		t.Fatalf("doc_read failed: %s", errorText(res))
 	}
@@ -140,13 +140,13 @@ func TestTwoAgentCollaboration(t *testing.T) {
 	if doc.Content != "# Payment PRD\n\nDraft v1.\n" {
 		t.Errorf("content = %q", doc.Content)
 	}
-	if doc.LastCommit.AuthorName != "Alice (agent)" {
-		t.Errorf("last author = %q, want Alice", doc.LastCommit.AuthorName)
+	if doc.LastCommit.AuthorName != "John (agent)" {
+		t.Errorf("last author = %q, want John", doc.LastCommit.AuthorName)
 	}
 
-	res = callTool(t, bobSess, "doc_update", map[string]any{
+	res = callTool(t, joeSess, "doc_update", map[string]any{
 		"path":         "docs/payment-prd.md",
-		"content":      "# Payment PRD\n\nDraft v2 with Bob's edits.\n",
+		"content":      "# Payment PRD\n\nDraft v2 with Joe's edits.\n",
 		"why":          "add risk analysis after reviewing the draft",
 		"expected_rev": doc.LastCommit.ShortHash,
 	})
@@ -154,7 +154,7 @@ func TestTwoAgentCollaboration(t *testing.T) {
 		t.Fatalf("doc_update failed: %s", errorText(res))
 	}
 
-	res = callTool(t, aliceSess, "doc_history", map[string]any{"path": "docs/payment-prd.md"})
+	res = callTool(t, johnSess, "doc_history", map[string]any{"path": "docs/payment-prd.md"})
 	if res.IsError {
 		t.Fatalf("doc_history failed: %s", errorText(res))
 	}
@@ -165,7 +165,7 @@ func TestTwoAgentCollaboration(t *testing.T) {
 	if len(hist.Commits) != 2 {
 		t.Fatalf("history has %d commits, want 2", len(hist.Commits))
 	}
-	if hist.Commits[0].AuthorName != "Bob (agent)" || hist.Commits[1].AuthorName != "Alice (agent)" {
+	if hist.Commits[0].AuthorName != "Joe (agent)" || hist.Commits[1].AuthorName != "John (agent)" {
 		t.Errorf("authors = %q, %q", hist.Commits[0].AuthorName, hist.Commits[1].AuthorName)
 	}
 	if !strings.Contains(hist.Commits[0].Body, "risk analysis") {
@@ -175,7 +175,7 @@ func TestTwoAgentCollaboration(t *testing.T) {
 
 func TestToolErrorsReachTheAgent(t *testing.T) {
 	ts := newTestServer(t)
-	sess := connect(t, ts, aliceToken)
+	sess := connect(t, ts, johnToken)
 
 	res := callTool(t, sess, "doc_update", map[string]any{
 		"path":    "docs/does-not-exist.md",
@@ -204,7 +204,7 @@ func TestToolErrorsReachTheAgent(t *testing.T) {
 
 func TestConflictSurfacesToAgent(t *testing.T) {
 	ts := newTestServer(t)
-	sess := connect(t, ts, aliceToken)
+	sess := connect(t, ts, johnToken)
 
 	callTool(t, sess, "doc_create", map[string]any{
 		"path": "docs/c.md", "content": "v1\n", "why": "seed doc for conflict test",
@@ -232,7 +232,7 @@ func TestConflictSurfacesToAgent(t *testing.T) {
 
 func TestSearchAndListOverHTTP(t *testing.T) {
 	ts := newTestServer(t)
-	sess := connect(t, ts, aliceToken)
+	sess := connect(t, ts, johnToken)
 
 	callTool(t, sess, "doc_create", map[string]any{
 		"path": "docs/adr-001.md", "content": "# ADR 001\n\nWe chose git as the database.\n",

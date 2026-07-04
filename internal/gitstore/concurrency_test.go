@@ -20,7 +20,7 @@ func TestConcurrentWrites(t *testing.T) {
 		go func() {
 			defer wg.Done()
 			path := fmt.Sprintf("docs/concurrent-%d.md", i)
-			errs <- s.Create(path, fmt.Sprintf("# Doc %d\n", i), "concurrency test writes ten docs at once", alice)
+			errs <- s.Create(path, fmt.Sprintf("# Doc %d\n", i), "concurrency test writes ten docs at once", john)
 		}()
 	}
 	wg.Wait()

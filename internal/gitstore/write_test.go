@@ -11,7 +11,7 @@ import (
 func TestCreate(t *testing.T) {
 	s := newTestStore(t)
 
-	err := s.Create("docs/prd.md", "# PRD\n\nBody.\n", "initial PRD for the payments project", alice)
+	err := s.Create("docs/prd.md", "# PRD\n\nBody.\n", "initial PRD for the payments project", john)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -20,8 +20,8 @@ func TestCreate(t *testing.T) {
 		t.Errorf("commit count = %d, want 2 (bootstrap + create)", n)
 	}
 	name, email, subject, body := lastCommitMeta(t, s)
-	if name != alice.Name || email != alice.Email {
-		t.Errorf("author = %s <%s>, want %s <%s>", name, email, alice.Name, alice.Email)
+	if name != john.Name || email != john.Email {
+		t.Errorf("author = %s <%s>, want %s <%s>", name, email, john.Name, john.Email)
 	}
 	if subject != "create: docs/prd.md" {
 		t.Errorf("subject = %q", subject)
@@ -43,7 +43,7 @@ func TestCreate(t *testing.T) {
 
 func TestCreateNormalizesTrailingNewline(t *testing.T) {
 	s := newTestStore(t)
-	if err := s.Create("docs/n.md", "no newline", "content without trailing newline", alice); err != nil {
+	if err := s.Create("docs/n.md", "no newline", "content without trailing newline", john); err != nil {
 		t.Fatal(err)
 	}
 	doc, err := s.Read("docs/n.md")
@@ -59,7 +59,7 @@ func TestCreateExisting(t *testing.T) {
 	s := newTestStore(t)
 	mustCreate(t, s, "docs/a.md", "v1\n")
 
-	err := s.Create("docs/a.md", "v2\n", "attempt to create over existing doc", bob)
+	err := s.Create("docs/a.md", "v2\n", "attempt to create over existing doc", joe)
 	var ee *ExistsError
 	if !errors.As(err, &ee) {
 		t.Fatalf("want ExistsError, got %v", err)
@@ -84,7 +84,7 @@ func TestCreateRejectsInvalidInput(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := s.Create(tt.path, "content\n", tt.why, alice)
+			err := s.Create(tt.path, "content\n", tt.why, john)
 			var ve *ValidationError
 			if !errors.As(err, &ve) {
 				t.Fatalf("want ValidationError, got %v", err)
@@ -100,7 +100,7 @@ func TestUpdate(t *testing.T) {
 	s := newTestStore(t)
 	mustCreate(t, s, "docs/a.md", "v1\n")
 
-	if err := s.Update("docs/a.md", "v2\n", "revise after review feedback", "", bob); err != nil {
+	if err := s.Update("docs/a.md", "v2\n", "revise after review feedback", "", joe); err != nil {
 		t.Fatal(err)
 	}
 
@@ -112,7 +112,7 @@ func TestUpdate(t *testing.T) {
 		t.Errorf("content = %q, want full replacement", doc.Content)
 	}
 	name, _, subject, body := lastCommitMeta(t, s)
-	if name != bob.Name || subject != "update: docs/a.md" || body != "revise after review feedback" {
+	if name != joe.Name || subject != "update: docs/a.md" || body != "revise after review feedback" {
 		t.Errorf("commit = %s / %q / %q", name, subject, body)
 	}
 	if n := commitCount(t, s); n != 3 {
@@ -122,7 +122,7 @@ func TestUpdate(t *testing.T) {
 
 func TestUpdateMissing(t *testing.T) {
 	s := newTestStore(t)
-	err := s.Update("docs/nope.md", "x\n", "update of a doc that does not exist", "", alice)
+	err := s.Update("docs/nope.md", "x\n", "update of a doc that does not exist", "", john)
 	var nf *NotFoundError
 	if !errors.As(err, &nf) {
 		t.Fatalf("want NotFoundError, got %v", err)
@@ -133,7 +133,7 @@ func TestUpdateNoChange(t *testing.T) {
 	s := newTestStore(t)
 	mustCreate(t, s, "docs/a.md", "same\n")
 
-	err := s.Update("docs/a.md", "same\n", "no-op update with identical content", "", bob)
+	err := s.Update("docs/a.md", "same\n", "no-op update with identical content", "", joe)
 	var nc *NoChangeError
 	if !errors.As(err, &nc) {
 		t.Fatalf("want NoChangeError, got %v", err)
@@ -152,22 +152,22 @@ func TestUpdateExpectedRev(t *testing.T) {
 	staleRev := gitOut(t, s, "rev-parse", "--short", "HEAD")
 
 	// Matching rev succeeds.
-	if err := s.Update("docs/a.md", "v2\n", "update with correct expected rev", "", bob); err != nil {
+	if err := s.Update("docs/a.md", "v2\n", "update with correct expected rev", "", joe); err != nil {
 		t.Fatal(err)
 	}
 	currentRev := gitOut(t, s, "rev-parse", "--short", "HEAD")
-	if err := s.Update("docs/a.md", "v3\n", "update guarded by current rev", currentRev, alice); err != nil {
+	if err := s.Update("docs/a.md", "v3\n", "update guarded by current rev", currentRev, john); err != nil {
 		t.Fatalf("update with matching expected_rev: %v", err)
 	}
 
 	// Stale rev conflicts and changes nothing.
 	before := commitCount(t, s)
-	err := s.Update("docs/a.md", "v4\n", "update guarded by stale rev", staleRev, bob)
+	err := s.Update("docs/a.md", "v4\n", "update guarded by stale rev", staleRev, joe)
 	var ce *ConflictError
 	if !errors.As(err, &ce) {
 		t.Fatalf("want ConflictError, got %v", err)
 	}
-	if ce.LastAuthor != alice.Name || ce.CurrentRev == "" {
+	if ce.LastAuthor != john.Name || ce.CurrentRev == "" {
 		t.Errorf("conflict details = %+v", ce)
 	}
 	if !strings.Contains(ce.Error(), "expected_rev") {
@@ -186,7 +186,7 @@ func TestDelete(t *testing.T) {
 	s := newTestStore(t)
 	mustCreate(t, s, "docs/old.md", "# Old\n")
 
-	if err := s.Delete("docs/old.md", "superseded by the new architecture doc", alice); err != nil {
+	if err := s.Delete("docs/old.md", "superseded by the new architecture doc", john); err != nil {
 		t.Fatal(err)
 	}
 
@@ -223,7 +223,7 @@ func TestDelete(t *testing.T) {
 
 func TestDeleteMissing(t *testing.T) {
 	s := newTestStore(t)
-	err := s.Delete("docs/nope.md", "delete of a doc that does not exist", alice)
+	err := s.Delete("docs/nope.md", "delete of a doc that does not exist", john)
 	var nf *NotFoundError
 	if !errors.As(err, &nf) {
 		t.Fatalf("want NotFoundError, got %v", err)
@@ -233,10 +233,10 @@ func TestDeleteMissing(t *testing.T) {
 func TestDeleteAlreadyArchived(t *testing.T) {
 	s := newTestStore(t)
 	mustCreate(t, s, "docs/a.md", "x\n")
-	if err := s.Delete("docs/a.md", "first archive of this doc", alice); err != nil {
+	if err := s.Delete("docs/a.md", "first archive of this doc", john); err != nil {
 		t.Fatal(err)
 	}
-	err := s.Delete("archive/docs/a.md", "attempt to delete an archived doc", alice)
+	err := s.Delete("archive/docs/a.md", "attempt to delete an archived doc", john)
 	var ve *ValidationError
 	if !errors.As(err, &ve) {
 		t.Fatalf("want ValidationError, got %v", err)
@@ -246,11 +246,11 @@ func TestDeleteAlreadyArchived(t *testing.T) {
 func TestDeleteArchiveCollision(t *testing.T) {
 	s := newTestStore(t)
 	mustCreate(t, s, "docs/a.md", "first\n")
-	if err := s.Delete("docs/a.md", "archive the first incarnation", alice); err != nil {
+	if err := s.Delete("docs/a.md", "archive the first incarnation", john); err != nil {
 		t.Fatal(err)
 	}
 	mustCreate(t, s, "docs/a.md", "second\n")
-	if err := s.Delete("docs/a.md", "archive the second incarnation", alice); err != nil {
+	if err := s.Delete("docs/a.md", "archive the second incarnation", john); err != nil {
 		t.Fatal(err)
 	}
 
@@ -265,7 +265,7 @@ func TestDeleteArchiveCollision(t *testing.T) {
 
 func mustCreate(t *testing.T, s *GitStore, path, content string) {
 	t.Helper()
-	if err := s.Create(path, content, "seed document for write-path tests", alice); err != nil {
+	if err := s.Create(path, content, "seed document for write-path tests", john); err != nil {
 		t.Fatalf("create %s: %v", path, err)
 	}
 }

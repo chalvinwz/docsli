@@ -8,10 +8,10 @@ import (
 
 func TestList(t *testing.T) {
 	s := newTestStore(t)
-	seedDoc(t, s, "docs/prd.md", "# Payment PRD\n\nBody.\n", alice, "create: docs/prd.md", "initial PRD draft for payments")
-	seedDoc(t, s, "notes/scratch.md", "no heading here\n", alice, "create: notes/scratch.md", "scratch notes for planning")
-	seedDoc(t, s, "notes/scratch.md", "no heading, edited\n", bob, "update: notes/scratch.md", "bob refines the notes")
-	seedDoc(t, s, "archive/old.md", "# Old\n", alice, "archive: old.md", "seed an archived doc")
+	seedDoc(t, s, "docs/prd.md", "# Payment PRD\n\nBody.\n", john, "create: docs/prd.md", "initial PRD draft for payments")
+	seedDoc(t, s, "notes/scratch.md", "no heading here\n", john, "create: notes/scratch.md", "scratch notes for planning")
+	seedDoc(t, s, "notes/scratch.md", "no heading, edited\n", joe, "update: notes/scratch.md", "joe refines the notes")
+	seedDoc(t, s, "archive/old.md", "# Old\n", john, "archive: old.md", "seed an archived doc")
 
 	docs, err := s.List("")
 	if err != nil {
@@ -32,15 +32,15 @@ func TestList(t *testing.T) {
 	if prd.Title != "Payment PRD" {
 		t.Errorf("title = %q, want heading text", prd.Title)
 	}
-	if prd.LastAuthor != alice.Name {
-		t.Errorf("prd last author = %q, want %q", prd.LastAuthor, alice.Name)
+	if prd.LastAuthor != john.Name {
+		t.Errorf("prd last author = %q, want %q", prd.LastAuthor, john.Name)
 	}
 	scratch := byPath["notes/scratch.md"]
 	if scratch.Title != "scratch" {
 		t.Errorf("headingless title = %q, want filename fallback", scratch.Title)
 	}
-	if scratch.LastAuthor != bob.Name {
-		t.Errorf("scratch last author = %q, want %q (latest committer)", scratch.LastAuthor, bob.Name)
+	if scratch.LastAuthor != joe.Name {
+		t.Errorf("scratch last author = %q, want %q (latest committer)", scratch.LastAuthor, joe.Name)
 	}
 	if scratch.LastModified.IsZero() {
 		t.Error("LastModified not populated")
@@ -49,8 +49,8 @@ func TestList(t *testing.T) {
 
 func TestListFolderFilter(t *testing.T) {
 	s := newTestStore(t)
-	seedDoc(t, s, "docs/a.md", "# A\n", alice, "create: docs/a.md", "seed doc a for tests")
-	seedDoc(t, s, "notes/b.md", "# B\n", alice, "create: notes/b.md", "seed doc b for tests")
+	seedDoc(t, s, "docs/a.md", "# A\n", john, "create: docs/a.md", "seed doc a for tests")
+	seedDoc(t, s, "notes/b.md", "# B\n", john, "create: notes/b.md", "seed doc b for tests")
 
 	docs, err := s.List("docs")
 	if err != nil {
@@ -63,7 +63,7 @@ func TestListFolderFilter(t *testing.T) {
 
 func TestListArchiveFolder(t *testing.T) {
 	s := newTestStore(t)
-	seedDoc(t, s, "archive/old.md", "# Old\n", alice, "archive: old.md", "seed archived doc")
+	seedDoc(t, s, "archive/old.md", "# Old\n", john, "archive: old.md", "seed archived doc")
 
 	docs, err := s.List("archive")
 	if err != nil {
@@ -84,7 +84,7 @@ func TestListRejectsTraversal(t *testing.T) {
 func TestRead(t *testing.T) {
 	s := newTestStore(t)
 	content := "# Read Me\n\nExact content, trailing newline preserved.\n"
-	seedDoc(t, s, "docs/read.md", content, alice, "create: docs/read.md", "seed for read test")
+	seedDoc(t, s, "docs/read.md", content, john, "create: docs/read.md", "seed for read test")
 
 	doc, err := s.Read("docs/read.md")
 	if err != nil {
@@ -93,7 +93,7 @@ func TestRead(t *testing.T) {
 	if doc.Content != content {
 		t.Errorf("content mismatch:\n got %q\nwant %q", doc.Content, content)
 	}
-	if doc.LastCommit.AuthorName != alice.Name || doc.LastCommit.Subject != "create: docs/read.md" {
+	if doc.LastCommit.AuthorName != john.Name || doc.LastCommit.Subject != "create: docs/read.md" {
 		t.Errorf("last commit = %+v", doc.LastCommit)
 	}
 	if doc.LastCommit.ShortHash == "" {
@@ -103,7 +103,7 @@ func TestRead(t *testing.T) {
 
 func TestReadNotFoundSuggests(t *testing.T) {
 	s := newTestStore(t)
-	seedDoc(t, s, "docs/setup.md", "# Setup\n", alice, "create: docs/setup.md", "seed for suggestion test")
+	seedDoc(t, s, "docs/setup.md", "# Setup\n", john, "create: docs/setup.md", "seed for suggestion test")
 
 	_, err := s.Read("docs/setp.md")
 	var nf *NotFoundError
@@ -120,7 +120,7 @@ func TestReadNotFoundSuggests(t *testing.T) {
 
 func TestReadArchivedDoc(t *testing.T) {
 	s := newTestStore(t)
-	seedDoc(t, s, "archive/gone.md", "# Gone\n", alice, "archive: gone.md", "seed archived for read")
+	seedDoc(t, s, "archive/gone.md", "# Gone\n", john, "archive: gone.md", "seed archived for read")
 
 	doc, err := s.Read("archive/gone.md")
 	if err != nil {
@@ -133,8 +133,8 @@ func TestReadArchivedDoc(t *testing.T) {
 
 func TestSearch(t *testing.T) {
 	s := newTestStore(t)
-	seedDoc(t, s, "docs/prd.md", "# PRD\n\nWe chose PostgreSQL for storage.\n", alice, "create: docs/prd.md", "seed searchable doc")
-	seedDoc(t, s, "archive/hidden.md", "PostgreSQL in the archive\n", alice, "archive: hidden.md", "seed archived doc")
+	seedDoc(t, s, "docs/prd.md", "# PRD\n\nWe chose PostgreSQL for storage.\n", john, "create: docs/prd.md", "seed searchable doc")
+	seedDoc(t, s, "archive/hidden.md", "PostgreSQL in the archive\n", john, "archive: hidden.md", "seed archived doc")
 
 	hits, err := s.Search("postgresql")
 	if err != nil {

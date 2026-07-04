@@ -21,9 +21,9 @@ tokens:
   - token: "dsl_chalvin_0123456789abcdef"
     name: "Chalvin (agent)"
     email: "chalvin-agent@cohort.local"
-  - token: "dsl_bima_0123456789abcdef"
-    name: "Bima (agent)"
-    email: "bima-agent@cohort.local"
+  - token: "dsl_john_0123456789abcdef"
+    name: "John (agent)"
+    email: "john-agent@cohort.local"
 `
 
 func TestLoad(t *testing.T) {

@@ -12,7 +12,7 @@
 ```
 ┌─────────────┐      ┌─────────────┐      ┌─────────────┐
 │ Claude Code │      │ Claude Code │      │ Claude Code │
-│  (Chalvin)  │      │   (Bima)    │      │    (...)    │
+│  (Chalvin)  │      │   (John)    │      │    (...)    │
 └──────┬──────┘      └──────┬──────┘      └──────┬──────┘
        │      MCP over streamable HTTP           │
        │      Authorization: Bearer <token>      │
@@ -91,7 +91,7 @@ Every write the agent makes lands as a commit under that person's configured ide
 
 ```
 $ git -C data/cohort-docs log --oneline
-9f3c2a1 update: docs/payment-prd.md      ← Bima (agent)
+9f3c2a1 update: docs/payment-prd.md      ← John (agent)
 5b81e77 create: docs/payment-prd.md      ← Chalvin (agent)
 ```
 

@@ -13,18 +13,18 @@ import (
 )
 
 var testTokens = []config.TokenEntry{
-	{Token: "dsl_alice_0123456789abcdef", Name: "Alice (agent)", Email: "alice-agent@cohort.local"},
-	{Token: "dsl_bob_0123456789abcdefgh", Name: "Bob (agent)", Email: "bob-agent@cohort.local"},
+	{Token: "dsl_john_0123456789abcdef", Name: "John (agent)", Email: "john-agent@cohort.local"},
+	{Token: "dsl_joe_0123456789abcdefgh", Name: "Joe (agent)", Email: "joe-agent@cohort.local"},
 }
 
 func TestVerifier(t *testing.T) {
 	verify := Verifier(testTokens)
 
-	info, err := verify(context.Background(), "dsl_bob_0123456789abcdefgh", nil)
+	info, err := verify(context.Background(), "dsl_joe_0123456789abcdefgh", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if info.Extra["name"] != "Bob (agent)" || info.Extra["email"] != "bob-agent@cohort.local" {
+	if info.Extra["name"] != "Joe (agent)" || info.Extra["email"] != "joe-agent@cohort.local" {
 		t.Errorf("identity = %v", info.Extra)
 	}
 	if info.Expiration.IsZero() {
@@ -50,7 +50,7 @@ func TestMiddleware(t *testing.T) {
 		authHeader string
 		wantStatus int
 	}{
-		{name: "valid token", authHeader: "Bearer dsl_alice_0123456789abcdef", wantStatus: http.StatusOK},
+		{name: "valid token", authHeader: "Bearer dsl_john_0123456789abcdef", wantStatus: http.StatusOK},
 		{name: "missing header", authHeader: "", wantStatus: http.StatusUnauthorized},
 		{name: "unknown token", authHeader: "Bearer dsl_wrong_0123456789abcde", wantStatus: http.StatusUnauthorized},
 		{name: "not bearer", authHeader: "Basic dXNlcjpwYXNz", wantStatus: http.StatusUnauthorized},

@@ -52,7 +52,7 @@ func TestPusherMirrorsCommitOnNotify(t *testing.T) {
 	t.Cleanup(cancel)
 	go p.Run(ctx)
 
-	if err := s.Create("docs/mirrored.md", "# Mirrored\n", "verify commits reach the mirror", alice); err != nil {
+	if err := s.Create("docs/mirrored.md", "# Mirrored\n", "verify commits reach the mirror", john); err != nil {
 		t.Fatal(err)
 	}
 	waitForSync(t, s, bare)
@@ -61,7 +61,7 @@ func TestPusherMirrorsCommitOnNotify(t *testing.T) {
 func TestPusherTickerCatchesUp(t *testing.T) {
 	s, bare := newMirroredStore(t)
 	// Commit while no pusher is running — simulates a push that failed.
-	seedDoc(t, s, "docs/late.md", "# Late\n", alice, "create: docs/late.md", "commit made before pusher started")
+	seedDoc(t, s, "docs/late.md", "# Late\n", john, "create: docs/late.md", "commit made before pusher started")
 
 	p := NewPusher(s, "origin", slog.New(slog.DiscardHandler))
 	p.tick = 20 * time.Millisecond
@@ -97,7 +97,7 @@ func TestPushFailureDoesNotFailWrites(t *testing.T) {
 	t.Cleanup(cancel)
 	go p.Run(ctx)
 
-	if err := s.Create("docs/ok.md", "# OK\n", "write must succeed even when mirror is down", alice); err != nil {
+	if err := s.Create("docs/ok.md", "# OK\n", "write must succeed even when mirror is down", john); err != nil {
 		t.Fatalf("write failed because of mirror: %v", err)
 	}
 	if n := commitCount(t, s); n != 2 {
