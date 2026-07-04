@@ -21,6 +21,23 @@ func newMirroredStore(t *testing.T) (*GitStore, runner) {
 	return s, bare
 }
 
+// startPusher runs p until test cleanup, and — crucially — waits for Run to
+// return before cleanup proceeds: the final flush push must not race the
+// TempDir removal.
+func startPusher(t *testing.T, p *Pusher) {
+	t.Helper()
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		p.Run(ctx)
+	}()
+	t.Cleanup(func() {
+		cancel()
+		<-done
+	})
+}
+
 func remoteHead(t *testing.T, bare runner) string {
 	t.Helper()
 	out, err := bare.run(context.Background(), "rev-parse", "HEAD")
@@ -47,10 +64,7 @@ func TestPusherMirrorsCommitOnNotify(t *testing.T) {
 	s, bare := newMirroredStore(t)
 	p := NewPusher(s, "origin", slog.New(slog.DiscardHandler))
 	s.SetOnWrite(p.Notify)
-
-	ctx, cancel := context.WithCancel(context.Background())
-	t.Cleanup(cancel)
-	go p.Run(ctx)
+	startPusher(t, p)
 
 	if err := s.Create("docs/mirrored.md", "# Mirrored\n", "verify commits reach the mirror", john); err != nil {
 		t.Fatal(err)
@@ -65,9 +79,7 @@ func TestPusherTickerCatchesUp(t *testing.T) {
 
 	p := NewPusher(s, "origin", slog.New(slog.DiscardHandler))
 	p.tick = 20 * time.Millisecond
-	ctx, cancel := context.WithCancel(context.Background())
-	t.Cleanup(cancel)
-	go p.Run(ctx)
+	startPusher(t, p)
 
 	// No Notify: only the ticker can pick this up.
 	waitForSync(t, s, bare)
@@ -92,10 +104,7 @@ func TestPushFailureDoesNotFailWrites(t *testing.T) {
 	gitOut(t, s, "remote", "add", "origin", "/nonexistent/docsli-mirror.git")
 	p := NewPusher(s, "origin", slog.New(slog.DiscardHandler))
 	s.SetOnWrite(p.Notify)
-
-	ctx, cancel := context.WithCancel(context.Background())
-	t.Cleanup(cancel)
-	go p.Run(ctx)
+	startPusher(t, p)
 
 	if err := s.Create("docs/ok.md", "# OK\n", "write must succeed even when mirror is down", john); err != nil {
 		t.Fatalf("write failed because of mirror: %v", err)
