@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"sync"
 	"syscall"
 	"time"
 
@@ -57,6 +58,20 @@ func run(configPath string, logger *slog.Logger) error {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
+	// Mirror pushes run in the background; on shutdown Run makes a final
+	// flush attempt before the WaitGroup releases.
+	var pusherWG sync.WaitGroup
+	if cfg.Mirror.Enabled {
+		pusher := gitstore.NewPusher(store, cfg.Mirror.Remote, logger)
+		store.SetOnWrite(pusher.Notify)
+		pusherWG.Add(1)
+		go func() {
+			defer pusherWG.Done()
+			pusher.Run(ctx)
+		}()
+		logger.Info("mirror push enabled", "remote", cfg.Mirror.Remote)
+	}
+
 	srv := mcpserver.New(store, logger, version)
 	handler := mcp.NewStreamableHTTPHandler(
 		func(*http.Request) *mcp.Server { return srv },
@@ -91,6 +106,7 @@ func run(configPath string, logger *slog.Logger) error {
 		if err := httpSrv.Shutdown(shutdownCtx); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			return err
 		}
+		pusherWG.Wait()
 		return nil
 	}
 }
