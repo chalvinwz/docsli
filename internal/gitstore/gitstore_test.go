@@ -3,10 +3,34 @@ package gitstore
 import (
 	"context"
 	"log/slog"
+	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"testing"
 )
+
+var (
+	alice = Identity{Name: "Alice (agent)", Email: "alice-agent@cohort.local"}
+	bob   = Identity{Name: "Bob (agent)", Email: "bob-agent@cohort.local"}
+)
+
+// seedDoc commits a document directly via git, bypassing the write path, so
+// read-path tests do not depend on Create/Update.
+func seedDoc(t *testing.T, s *GitStore, path, content string, author Identity, subject, why string) {
+	t.Helper()
+	full := filepath.Join(s.Dir(), path)
+	if err := os.MkdirAll(filepath.Dir(full), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(full, []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	gitOut(t, s, "add", "--", path)
+	if err := s.commit(context.Background(), author, subject, why); err != nil {
+		t.Fatalf("seed commit %s: %v", path, err)
+	}
+}
 
 // newTestStore opens a store on a fresh temp repo with host git config
 // isolated, so commit signing, hooks, or author settings on the developer's
