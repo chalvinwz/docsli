@@ -81,7 +81,7 @@ func run(configPath string, logger *slog.Logger) error {
 	mux := http.NewServeMux()
 	mux.Handle("/mcp", sdkauth.RequireBearerToken(auth.Verifier(cfg.Tokens), nil)(handler))
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, _ *http.Request) {
-		fmt.Fprintln(w, "ok")
+		_, _ = fmt.Fprintln(w, "ok")
 	})
 
 	httpSrv := &http.Server{

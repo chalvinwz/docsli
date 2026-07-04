@@ -104,9 +104,9 @@ func (h *handlers) docCreate(_ context.Context, req *mcp.CallToolRequest, in doc
 }
 
 type docUpdateIn struct {
-	Path    string `json:"path" jsonschema:"Repo-relative path of the existing document to update."`
-	Content string `json:"content" jsonschema:"The COMPLETE new markdown content. This replaces the whole document, so include everything that should remain, not just your changes."`
-	Why     string `json:"why" jsonschema:"One or two sentences explaining WHY you are making this change. Becomes the permanent git commit message. Minimum 10 characters."`
+	Path        string `json:"path" jsonschema:"Repo-relative path of the existing document to update."`
+	Content     string `json:"content" jsonschema:"The COMPLETE new markdown content. This replaces the whole document, so include everything that should remain, not just your changes."`
+	Why         string `json:"why" jsonschema:"One or two sentences explaining WHY you are making this change. Becomes the permanent git commit message. Minimum 10 characters."`
 	ExpectedRev string `json:"expected_rev,omitempty" jsonschema:"Strongly recommended: the last_commit.short_hash you got from doc_read. If the doc changed since, the update is rejected with the current revision instead of overwriting someone else's work. Omit to force last-write-wins."`
 }
 

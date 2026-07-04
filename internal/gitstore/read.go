@@ -153,7 +153,7 @@ func (s *GitStore) titleOf(path string) string {
 	if err != nil {
 		return fallback
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	sc := bufio.NewScanner(io.LimitReader(f, 4096))
 	for sc.Scan() {

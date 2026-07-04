@@ -1,0 +1,18 @@
+services:
+  docsli:
+    build: .
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./data:/data
+      - ./config.yml:/config.yml:ro
+      # Optional: SSH deploy key for the GitHub mirror (see README).
+      # - ./deploy_key:/home/docsli/.ssh/id_ed25519:ro
+    # environment:
+    #   GIT_SSH_COMMAND: ssh -i /home/docsli/.ssh/id_ed25519 -o StrictHostKeyChecking=accept-new
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://localhost:8080/healthz"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+    restart: unless-stopped
