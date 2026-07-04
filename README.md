@@ -85,11 +85,11 @@ Multi-arch images (amd64 + arm64) are published to [ghcr.io/chalvinwz/docsli](ht
 
 ```bash
 mkdir docsli && cd docsli
-curl -O https://raw.githubusercontent.com/chalvinwz/docsli/main/docker-compose.prod.yml
+curl -O https://raw.githubusercontent.com/chalvinwz/docsli/main/examples/docker-compose.yml
 curl -o config.yml https://raw.githubusercontent.com/chalvinwz/docsli/main/config.example.yml
 
 $EDITOR config.yml           # map tokens to identities; openssl rand -hex 24
-docker compose -f docker-compose.prod.yml up -d
+docker compose up -d
 
 curl http://localhost:8080/healthz    # → ok
 ```
