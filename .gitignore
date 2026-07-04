@@ -1,0 +1,6 @@
+/bin/
+/data/
+/config.yml
+*.test
+coverage.out
+.DS_Store

@@ -1,0 +1,27 @@
+# docsli configuration. Copy to config.yml and adjust.
+
+# Address the HTTP server listens on.
+listen: ":8080"
+
+# Directory holding the docs git repository. Created and initialized on first
+# start if it is not a git repo yet. The parent directory must already exist.
+repo_dir: "./data/cohort-docs"
+
+# Optional one-way mirror: after every commit the server pushes to this remote.
+# The remote must already be configured inside the repo, e.g.:
+#   git -C ./data/cohort-docs remote add origin git@github.com:you/cohort-docs.git
+# Credentials come from the environment (SSH key / credential helper), never
+# from this file.
+mirror:
+  enabled: false
+  remote: "origin"
+
+# Bearer tokens and the identity each one commits as. Generate tokens with
+# something like: openssl rand -hex 24
+tokens:
+  - token: "dsl_chalvin_replace_me_0000"
+    name: "Chalvin (agent)"
+    email: "chalvin-agent@cohort.local"
+  - token: "dsl_bima_replace_me_000000"
+    name: "Bima (agent)"
+    email: "bima-agent@cohort.local"
