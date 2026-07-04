@@ -159,10 +159,44 @@ git checkout HEAD~5 -- docs/prd.md   # any historical version
 
 Stop the server forever and you lose nothing: the repo *is* the product. Any git host, any editor, any future tool picks it up as-is.
 
+## Deploying behind a reverse proxy (VPS / EC2)
+
+docsli is built for TLS termination at a proxy: it binds plain HTTP on a private address and the proxy fronts it with HTTPS. In stateless MCP mode there are **no long-lived streaming connections** — every tool call is a short POST/response cycle — so default proxy timeouts just work, on nginx and AWS ALB alike.
+
+### nginx
+
+```nginx
+server {
+    listen 443 ssl;
+    server_name docs.example.com;
+    # ssl_certificate / ssl_certificate_key via certbot or your CA
+
+    location / {
+        proxy_pass http://127.0.0.1:8080;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        client_max_body_size 20m;   # doc content travels in JSON bodies; default 1m 413s large docs
+        proxy_buffering off;         # MCP responses are event-stream framed
+    }
+}
+```
+
+### AWS ALB
+
+- Target group: the one instance, port 8080, health check path `/healthz` (unauthenticated by design), expect HTTP 200.
+- Default idle timeout (60s) is fine — server-side git operations are capped at 30s.
+- HTTPS listener with an ACM certificate; keep port 8080 closed in the security group so only the ALB reaches the instance.
+
+### Things to know
+
+- **Scale up, not out.** The repo lives on local disk and writes are serialized in-process — run exactly one instance. Two replicas would each have their own repo and race the mirror.
+- **Persistence:** keep the data volume on durable disk (EBS on EC2), and enable the GitHub mirror as an off-site backup.
+- **Rate limiting** is not built in; add nginx `limit_req` or AWS WAF in front if the endpoint is internet-facing.
+
 ## Security notes
 
-- **Run behind TLS.** docsli speaks plain HTTP; put it behind a reverse proxy (Caddy, nginx, Traefik) or keep it on a private network / VPN. Bearer tokens are transport secrets — over plain HTTP on a public network they can be sniffed.
-- Tokens map to identities in `config.yml`; compare happens in constant time. Rotate by editing the file and restarting.
+- **Run behind TLS.** docsli speaks plain HTTP; put it behind a reverse proxy (Caddy, nginx, Traefik, ALB) or keep it on a private network / VPN. Bearer tokens are transport secrets — over plain HTTP on a public network they can be sniffed.
+- Tokens map to identities in your config (env vars or `config.yml`); compare happens in constant time. Rotate by editing and restarting.
 - The server never logs tokens or document content — only who wrote what path, when.
 - Path traversal, absolute paths, non-markdown files, and anything touching `.git` are rejected on every tool call.
 
